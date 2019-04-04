@@ -265,7 +265,7 @@ def update_a_output(list_of_contents, list_of_names, list_of_dates):
      State('loaded-Y-data', 'children'),
      State('loaded-Z-data', 'children'),
      State('loaded-A-data', 'children')])
-def update_graph(n_clicks, parm, axes_format, selected_parms, selected_data, s_data, y_data, z_data, a_data):
+def update_graph(n_clicks, parm, axes_format, selected_rows, selected_data, s_data, y_data, z_data, a_data):
     json_data = None
     if parm == 'S':
         json_data = s_data
@@ -291,27 +291,31 @@ def update_graph(n_clicks, parm, axes_format, selected_parms, selected_data, s_d
             ntwk = load_touchstone(val.encode(), key)
             for i in range(len(ntwk.s[0, :, 0])):
                 for j in range(len(ntwk.s[0, 0, :])):
-                    yvals1 = []
-                    yvals2 = []
-                    if axes_format == "MAG":
-                        yvals1.append(np.abs(ntwk.s[:, i, j]))
-                        yvals2.append(np.angle(ntwk.s[:, i, j]))
-                    elif axes_format == "RI":
-                        yvals1.append(np.real(ntwk.s[:, i, j]))
-                        yvals2.append(np.imag(ntwk.s[:, i, j]))
-                    elif axes_format == "Bode":
-                        return html.Div("Option Under Development.")
+                    for k in selected_rows:
+                        if selected_data[k]['Parameters'] == f'{i+1}{j+1}':
+                            yvals1 = []
+                            yvals2 = []
+                            if axes_format == "MAG":
+                                yvals1.append(np.abs(ntwk.s[:, i, j]))
+                                yvals2.append(np.angle(ntwk.s[:, i, j]))
+                            elif axes_format == "RI":
+                                yvals1.append(np.real(ntwk.s[:, i, j]))
+                                yvals2.append(np.imag(ntwk.s[:, i, j]))
+                            elif axes_format == "Bode":
+                                return html.Div("Option Under Development.")
 
-                    traces1.append(
-                        go.Scatter(x=ntwk.f, y=yvals1[0],
-                                   name='{}{}{} {}'.format(parm, i + 1, j + 1, key)
-                                   )
-                    )
-                    traces2.append(
-                        go.Scatter(x=ntwk.f, y=yvals2[0],
-                                   name='{}{}{} {}'.format(parm, i + 1, j + 1, key)
-                                   )
-                    )
+                            traces1.append(
+                                go.Scatter(x=ntwk.f, y=yvals1[0],
+                                           name='{}{}{} {}'.format(parm, i + 1, j + 1, key)
+                                           )
+                            )
+                            traces2.append(
+                                go.Scatter(x=ntwk.f, y=yvals2[0],
+                                           name='{}{}{} {}'.format(parm, i + 1, j + 1, key)
+                                           )
+                            )
+                        else:
+                            continue
 
 # Define Layouts
         if axes_format == "MAG":
