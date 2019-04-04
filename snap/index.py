@@ -12,6 +12,7 @@ from dash.dependencies import Input, Output
 from app import app
 from apps import app_viewer
 
+
 changes = ''
 with open(join(dirname(dirname(__file__)), 'CHANGELOG.md')) as f:
     changes = changes+f.read()
@@ -43,3 +44,5 @@ def display_page(pathname):
 
 if __name__ == '__main__':
     app.run_server(debug=True)
+    # hubzero requres these port and host settings
+    # app.run_server(port=8000, host='0.0.0.0')
