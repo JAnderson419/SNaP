@@ -6,7 +6,7 @@ install:
   - pip install codecov
 
 script:
-  - coverage run .\tests\*.py
+  - coverage run --source=tests/ tests.py
 
 after_success:
   - codecov
