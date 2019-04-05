@@ -6,7 +6,7 @@ install:
   - pip install codecov
 
 script:
-  - coverage run tests/tests.py
+  - coverage run --source=snap/ tests/tests.py
 
 after_success:
   - codecov
