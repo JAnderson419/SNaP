@@ -4,7 +4,7 @@ Created on Tue Mar 26 14:57:14 2019
 
 @author: ander906
 """
-from os.path import join, dirname
+from os.path import join, dirname, abspath
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output
@@ -14,7 +14,7 @@ from apps import app_viewer
 
 
 changes = ''
-with open(join(dirname(dirname(__file__)), 'CHANGELOG.md')) as f:
+with open(join(dirname(dirname(abspath(__file__))), 'CHANGELOG.md')) as f:
     changes = changes+f.read()
 
 app.layout = html.Div([

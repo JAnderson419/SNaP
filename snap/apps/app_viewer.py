@@ -112,9 +112,24 @@ layout = html.Div([
 ])
 
 
-def load_touchstone(content_string, filename):
-    # Define subclass of BytesIO to define a name property, which skrf expects
+def load_touchstone(content_string: str, filename: str) -> rf.Network:
+    """
+    Loads s-parameter data into a skrf network object from an uploaded encoded str.
+
+    Parameters
+    ----------
+    content_string : str
+        Encoded string containing touchstone data
+    filename : str
+        The filename of the touchstone file.
+    Returns
+    -------
+    d : skrf.Network
+        A skrf Network object holding s-parameter data from the touchstone file.
+
+    """
     class dataIO(io.BytesIO):
+        """Class used to trick skrf into thinking it is reading a file object."""
         _filename: str
 
         def __init__(self, data, filename):
