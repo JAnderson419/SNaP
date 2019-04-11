@@ -10,16 +10,22 @@ import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output
 
-hubzero=False
 
-for arg in sys.argv:
+hubzero=False
+auth_on = True
+for arg in sys.argv:  # Check if any hubzero runtime arguments were specified.
     if arg == 'hubzero':
         hubzero=True
+    elif arg == 'noauth':
+        auth_on = False
     else:
         continue
-
+# Handle conditional imports for hubzero hosting
 if hubzero:
+    from hublib.util import check_access
     from hubzeroapp import app
+
+    if auth_on: check_access(app)
 else:
     from app import app
 from apps import app_viewer
