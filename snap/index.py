@@ -5,19 +5,21 @@ Created on Tue Mar 26 14:57:14 2019
 @author: ander906
 """
 import sys
-from os.path import join, dirname, abspath, basename
+from os.path import join, dirname, abspath, basename, realpath
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output
 
-
-hubzero=False
+hubzero = False
 auth_on = True
+flask_debug = False
 for arg in sys.argv:  # Check if any hubzero runtime arguments were specified.
     if arg == 'hubzero':
-        hubzero=True
+        hubzero = True
     elif arg == 'noauth':
         auth_on = False
+    elif arg == "debug":
+        flask_debug = True
     else:
         continue
 # Handle conditional imports for hubzero hosting
@@ -29,6 +31,9 @@ if hubzero:
 else:
     from app import app
 from apps import app_viewer
+
+if flask_debug:
+    from werkzeug.middleware.profiler import ProfilerMiddleware
 
 changes = ''
 with open(join(dirname(dirname(abspath(__file__))), 'CHANGELOG.md')) as f:
@@ -79,4 +84,12 @@ if __name__ == '__main__':
     if hubzero:
         app.run_server(port=8000, host='0.0.0.0')
     else:
-        app.run_server(debug=True)
+        if flask_debug:
+            print(join(dirname(dirname(realpath(__file__))), 'debug'))
+            app.server.config['PROFILE'] = True
+            app.server.wsgi_app = ProfilerMiddleware(app.server.wsgi_app,
+                                                     restrictions=[30],
+                                                     profile_dir=join(dirname(dirname(realpath(__file__))), 'debug'))
+            app.run_server(debug=False)
+        else:
+            app.run_server(debug=True)

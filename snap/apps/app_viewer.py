@@ -291,7 +291,7 @@ def update_graph(n_clicks, parm, axes_format, selected_rows, selected_data, s_da
     elif parm == 'A':
         json_data = a_data
     else:
-        return html.Div("Unrecognized Parameter.")
+        return html.Div(children="Unrecognized Parameter.")
 
     if json_data is None or json_data == []:
         return html.Div(children='Please Upload Data to Plot.')
