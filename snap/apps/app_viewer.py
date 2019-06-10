@@ -8,8 +8,8 @@ import base64
 import io
 import json
 import dash_table
-import copy as cp
 import numpy as np
+import matplotlib.pyplot as plt
 import skrf as rf
 import plotly.graph_objs as go
 import dash_core_components as dcc
@@ -44,14 +44,15 @@ layout = html.Div([
     html.Hr(),
     html.Div([
         html.Div([
+            html.Button('Plot', id='button'),
             html.Label('Parameter Type'),
             dcc.RadioItems(
                 id='parm-select',
                 options=[
                     {'label': 'S Parameters', 'value': 'S'},
                     {'label': 'Y Parameters', 'value': 'Y'},
-                    {'label': 'Z Parameters', 'value': 'Z'},
-                    {'label': 'ABCD Parameters', 'value': 'A'}
+                    {'label': 'Z Parameters', 'value': 'Z'}
+                    # {'label': 'ABCD Parameters', 'value': 'A'}
                 ],
                 value='S'),
             html.Label('Plot Axes'),
@@ -63,22 +64,26 @@ layout = html.Div([
                     {'label': 'Bode', 'value': 'Bode'}
                 ],
                 value='MAG'),
-            dash_table.DataTable(
-                id='port-table',
-                css=[{
-                    'selector': '.dash-cell div.dash-cell-value',
-                    'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
-                }],
-                columns=[{"name": "Parameters",
-                          "id": "Parameters"}],
-                data=[],
-                filtering=False,
-                editable=False,
-                sorting=False,
-                row_selectable="multi",
-                selected_rows=[],
-            ),
-            html.Button('Plot', id='button'),
+            html.Details(id='port-table-div', open=False, children=[
+                html.Summary('Port Selector'),
+                html.Div(
+                    dash_table.DataTable(
+                        id='port-table',
+                        css=[{
+                            'selector': '.dash-cell div.dash-cell-value',
+                            'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
+                        }],
+                        columns=[{"name": "Parameters",
+                                  "id": "Parameters"}],
+                        data=[],
+                        filtering=False,
+                        editable=False,
+                        sorting=False,
+                        row_selectable="multi",
+                        selected_rows=[],
+                    ),
+                )]
+                         ),
             html.Hr(),
             html.H4("Loading Status"),
             html.H5("S:"),
@@ -154,6 +159,7 @@ def load_touchstone(content_string: str, filename: str) -> rf.Network:
 
 @app.callback([Output('output-data-upload', 'children'),
                Output('loaded-S-data', 'children'),
+               Output('port-table-div', 'open'),
                Output('port-table', 'data')],
               [Input('upload-data', 'contents')],
               [State('upload-data', 'filename'),
@@ -169,7 +175,7 @@ def update_s_output(list_of_contents, list_of_names, list_of_dates):
             ct, cs = c.split(',')
             content_type.append(ct)
             content_string.append(cs)
-        for c, n in zip(content_string, list_of_names       ):
+        for c, n in zip(content_string, list_of_names):
             decoded = base64.b64decode(c)
             try:
                 data = load_touchstone(decoded, n)
@@ -187,7 +193,7 @@ def update_s_output(list_of_contents, list_of_names, list_of_dates):
                 for i in range(len(data.s[0, :, 0])):
                     for j in range(len(data.s[0, 0, :])):
                         ports.append({"Parameters": '{}{}'.format(i + 1, j + 1)})
-        return ch, html.Div(json.dumps(d)), ports
+        return ch, html.Div(json.dumps(d)), True, ports
 
 
 @app.callback(Output('loaded-Y-data', 'children'),
@@ -317,7 +323,12 @@ def update_graph(n_clicks, parm, axes_format, selected_rows, selected_data, s_da
                                 yvals1.append(np.real(ntwk.s[:, i, j]))
                                 yvals2.append(np.imag(ntwk.s[:, i, j]))
                             elif axes_format == "Bode":
-                                return html.Div("Option Under Development.")
+                                # mpl_to_plotly and plotly don't support Bode plots, so data is plotted
+                                # in mpl and read in as image. traces1 stores y data, traces2 stores
+                                # trace labels for figure
+                                traces1.append(ntwk.s[:, i, j])
+                                traces2.append(f'{parm}{i + 1}{j + 1}')
+                                continue  # skip normal plotly output
 
                             traces1.append(
                                 go.Scatter(x=ntwk.f, y=yvals1[0],
@@ -372,19 +383,28 @@ def update_graph(n_clicks, parm, axes_format, selected_rows, selected_data, s_da
                 hovermode='closest'
             ))
         elif axes_format == "Bode":
-            return html.Div("Option Under Development.")
-        #        ax1.set_title('Gmdd')
-        #        ax1.set_ylabel('|gm$_{dd}$| [S]')
-        #        ax12.set_ylabel('Phase gm$_{dd}$, [deg]')
-        #        ax1.yaxis.set_major_formatter(EngFormatter())
-        #        ax1.xaxis.set_major_formatter(EngFormatter(unit='Hz'))
-        #        ax12.xaxis.set_major_formatter(EngFormatter(unit='Hz'))
-        #        ax12.set_xlabel('Frequency')
-        #        fig.autofmt_xdate(rotation=20, ha='right')
-        #        ax1.legend())
+            # See https://github.com/4QuantOSS/DashIntro/blob/master/notebooks/Tutorial.ipynb
+            # for example of encoding mpl figure to image for dash
 
-        #        print(mpl_to_plotly(fig))
-        #        print (traces)
+            # return html.Div("Option Under Development.")
+            fig = plt.figure()
+            ax1 = fig.add_subplot(111)
+            legend_entry = []
+            for i, s in enumerate(traces1):
+                if parm == 'Y':
+                    rf.plotting.plot_smith(s, ax=ax1, label=traces2[i], chart_type='y')
+                else:
+                    rf.plotting.plot_smith(s, ax=ax1, label=traces2[i])
+            out_img = io.BytesIO()
+            fig.savefig(out_img, format='png')
+            fig.clf()
+            plt.close('all')
+            out_img.seek(0)  # rewind file
+            encoded = base64.b64encode(out_img.read()).decode("ascii").replace("\n", "")
+            return html.Div([  # skip normal plotly graph return and return image of plt.figure() instead
+                html.Div('Interactive Bode plots not yet supported.'),
+                html.Img(src="data:image/png;base64,{}".format(encoded))
+            ])
         return html.Div(
             [
                 dcc.Graph(figure={'data': traces1, 'layout': layout1[0]}),
