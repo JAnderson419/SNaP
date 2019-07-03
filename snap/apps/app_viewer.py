@@ -15,8 +15,11 @@ import plotly.graph_objs as go
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output, State
+from flask_caching import Cache
 
 from app import app
+
+write_snp = False
 
 layout = html.Div([
     html.H3('S Parameter Viewer'),
@@ -24,7 +27,8 @@ layout = html.Div([
         id='upload-data',
         children=html.Div([
             'Drag and Drop or ',
-            html.A('Select a Touchstone File.')
+            html.A('Select a Touchstone File'),
+            ' (~20 MB max).'
         ]),
         style={
             'width': '100%',
@@ -45,27 +49,29 @@ layout = html.Div([
     html.Div([
         html.Div([
             html.Button('Plot', id='button'),
-            html.Label('Parameter Type'),
-            dcc.RadioItems(
-                id='parm-select',
-                options=[
-                    {'label': 'S Parameters', 'value': 'S'},
-                    {'label': 'Y Parameters', 'value': 'Y'},
-                    {'label': 'Z Parameters', 'value': 'Z'}
-                    # {'label': 'ABCD Parameters', 'value': 'A'}
-                ],
-                value='S'),
-            html.Label('Plot Axes'),
-            dcc.RadioItems(
-                id='axes-select',
-                options=[
-                    {'label': 'Magnitude/Phase', 'value': 'MAG'},
-                    {'label': 'Real/Imaginary', 'value': 'RI'},
-                    {'label': 'Bode', 'value': 'Bode'}
-                ],
-                value='MAG'),
+            html.Details(id='parameter-control-div', open=True, children=[
+                html.Summary('Parameter Selection'),
+                html.Label('Parameter Type'),
+                dcc.RadioItems(
+                    id='parm-select',
+                    options=[
+                        {'label': 'S Parameters', 'value': 'S'},
+                        {'label': 'Y Parameters', 'value': 'Y'},
+                        {'label': 'Z Parameters', 'value': 'Z'}
+                        # {'label': 'ABCD Parameters', 'value': 'A'}
+                    ],
+                    value='S'),
+                html.Label('Plot Axes'),
+                dcc.RadioItems(
+                    id='axes-select',
+                    options=[
+                        {'label': 'Magnitude/Phase', 'value': 'MAG'},
+                        {'label': 'Real/Imaginary', 'value': 'RI'},
+                        {'label': 'Bode', 'value': 'Bode'}
+                    ],
+                    value='MAG')]),
             html.Details(id='port-table-div', open=False, children=[
-                html.Summary('Port Selector'),
+                html.Summary('Port Selection'),
                 html.Div(
                     dash_table.DataTable(
                         id='port-table',
@@ -115,6 +121,29 @@ layout = html.Div([
     html.Div(id='loaded-Z-data', style={'display': 'none'}),
     html.Div(id='loaded-A-data', style={'display': 'none'}),
 ])
+
+
+class TouchstoneEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, np.complex):
+            return np.real(obj), np.imag(obj)  # split into [real, im]
+        if isinstance(obj, rf.Frequency):
+            return obj.f.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+
+def from_json(obj):
+    ntwk = rf.Network()
+    ntwk.name = obj['name']
+    ntwk.comments = obj['comments']
+    ntwk.port_names = obj['port_names']
+    ntwk.z0 = np.array(obj['_z0'])[..., 0] + np.array(obj['_z0'])[..., 1] * 1j  # recreate complex numbers
+    ntwk.s = np.array(obj['_s'])[..., 0] + np.array(obj['_s'])[..., 1] * 1j
+    ntwk.f = np.array(obj['_frequency'])
+    ntwk.variables = obj['variables']
+    return ntwk
 
 
 def load_touchstone(content_string: str, filename: str) -> rf.Network:
@@ -188,12 +217,16 @@ def update_s_output(list_of_contents, list_of_names, list_of_dates):
             ch.append((html.Div([
                 html.Div(data.__str__()),
             ])))
-            d[n] = data.write_touchstone(return_string=True)
+            if write_snp:
+                d[n] = data.write_touchstone(return_string=True)
+            else:
+                d[n] = data.__dict__
             if ports == []:
                 for i in range(len(data.s[0, :, 0])):
                     for j in range(len(data.s[0, 0, :])):
                         ports.append({"Parameters": '{}{}'.format(i + 1, j + 1)})
-        return ch, html.Div(json.dumps(d)), True, ports
+
+        return ch, html.Div(json.dumps(d, cls=TouchstoneEncoder)), True, ports
 
 
 @app.callback(Output('loaded-Y-data', 'children'),
@@ -217,9 +250,11 @@ def update_y_output(list_of_contents, list_of_names, list_of_dates):
                 print(e)
                 return html.Div([])
             data.s = data.y
-            sd = data.write_touchstone(return_string=True)
-            d[n] = sd
-        return html.Div(json.dumps(d))
+            if write_snp:
+                d[n] = data.write_touchstone(return_string=True)
+            else:
+                d[n] = data.__dict__
+        return html.Div(json.dumps(d, cls=TouchstoneEncoder))
 
 
 @app.callback(Output('loaded-Z-data', 'children'),
@@ -243,9 +278,11 @@ def update_z_output(list_of_contents, list_of_names, list_of_dates):
                 print(e)
                 return html.Div([])
             data.s = data.z
-            sd = data.write_touchstone(return_string=True)
-            d[n] = sd
-        return html.Div(json.dumps(d))
+            if write_snp:
+                d[n] = data.write_touchstone(return_string=True)
+            else:
+                d[n] = data.__dict__
+        return html.Div(json.dumps(d, cls=TouchstoneEncoder))
 
 
 @app.callback(Output('loaded-A-data', 'children'),
@@ -269,9 +306,11 @@ def update_a_output(list_of_contents, list_of_names, list_of_dates):
                 print(e)
                 return html.Div([])
             data.s = data.a
-            sd = data.write_touchstone(return_string=True)
-            d[n] = sd
-        return html.Div(json.dumps(d))
+            if write_snp:
+                d[n] = data.write_touchstone(return_string=True)
+            else:
+                d[n] = data.__dict__
+        return html.Div(json.dumps(d, cls=TouchstoneEncoder))
 
 
 @app.callback(
@@ -307,9 +346,11 @@ def update_graph(n_clicks, parm, axes_format, selected_rows, selected_data, s_da
         layout1 = []
         layout2 = []
         data = json.loads(json_data['props']['children'])
-        #        print(data)
         for key, val in data.items():
-            ntwk = load_touchstone(val.encode(), key)
+            if write_snp:
+                ntwk = load_touchstone(val.encode(), key)
+            else:
+                ntwk = from_json(val)
             for i in range(len(ntwk.s[0, :, 0])):
                 for j in range(len(ntwk.s[0, 0, :])):
                     for k in selected_rows:
