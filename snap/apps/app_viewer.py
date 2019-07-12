@@ -20,6 +20,8 @@ from app import app
 
 write_snp = False
 
+col_header_test = ["m{}".format(i) for i in range(4)]
+
 layout = html.Div([
     html.H3('S Parameter Viewer'),
     dcc.Upload(
@@ -81,14 +83,52 @@ layout = html.Div([
                         columns=[{"name": "Parameters",
                                   "id": "Parameters"}],
                         data=[],
-                        filtering=False,
                         editable=False,
-                        sorting=False,
                         row_selectable="multi",
                         selected_rows=[],
                     ),
+                ),
+                html.Div(
+                    dash_table.DataTable(
+                        id='port-table-test',
+                        css=[{
+                            'selector': '.dash-cell div.dash-cell-value',
+                            'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
+                        }],
+                        style_table={'overflowX': 'scroll'},
+                        columns=[{"name": i,
+                                  "id": i,
+                                  'presentation': 'dropdown'}
+                                 for i in col_header_test],
+                        data=[{i:j for i in col_header_test} for j in ['Plot']*len(col_header_test)],
+                        dropdown={
+                            j: {
+                                'options': [
+                                    {'label': i, 'value': i}
+                                    for i in ['Plot','Off']
+                                ]
+                            } for j in col_header_test},
+                        style_data_conditional=[
+                            {
+                                'if': {
+                                    'column_id': 'm0',
+                                    'filter_query': '{m0} contains "Plot"'
+                                },
+                                'backgroundColor': '#38af2c3',
+                            }],
+                        # style_data_conditional=[
+                        #     {
+                        #         'if': {
+                        #             'column_id': i,
+                        #             'filter_query': '{{{}}} contains "l"'.format(i)
+                        #         },
+                        #         'backgroundColor': '#38af2c3',
+                        #     } for i in col_header_test],
+                        editable=True,
+                        selected_rows=[],
+                    ),
                 )]
-                         ),
+            ),
             html.Hr(),
             html.H4("Loading Status"),
             html.H5("S:"),
