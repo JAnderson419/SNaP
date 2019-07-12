@@ -6,6 +6,7 @@ Created on Tue Mar 26 14:59:14 2019
 """
 import base64
 import io
+import os
 import json
 import dash_table
 import numpy as np
@@ -15,8 +16,16 @@ import plotly.graph_objs as go
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output, State
+from flask_caching import Cache
 
 from app import app
+
+cache = Cache(app.server, config={
+    'CACHE_TYPE': 'filesystem',
+    'CACHE_DIR': os.getcwd(),
+    'CACHE_THRESHOLD': 20
+})
+TIMEOUT = 600
 
 write_snp = False
 
