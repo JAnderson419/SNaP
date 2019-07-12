@@ -17,15 +17,15 @@ import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output, State
 from flask_caching import Cache
+from uuid import uuid4
 
 from app import app
 
 cache = Cache(app.server, config={
     'CACHE_TYPE': 'filesystem',
-    'CACHE_DIR': os.getcwd(),
+    'CACHE_DIR': os.path.join(os.getcwd(),'cache'),
     'CACHE_THRESHOLD': 20
 })
-TIMEOUT = 600
 
 write_snp = False
 
@@ -36,7 +36,10 @@ layout = html.Div([
         dcc.Tab(label='Data Import', value='data-import'),
         dcc.Tab(label='SnP Viewer', value='snp-viewer'),
     ]),
-    html.Div(id='tabs-content-example')
+    html.Div(id='tabs-content-example'),
+    html.Div(id='uuid-hidden-div',
+             children=str(uuid4()),
+             style={'display': 'none'})
 ])
 
 @app.callback(Output('tabs-content-example', 'children'),
