@@ -4,6 +4,27 @@ import numpy as np
 import skrf as rf
 from os.path import join, realpath, pardir, abspath
 
+import hypothesis.strategies as st
+
+unit_dict = { \
+    'hz': 'Hz', \
+    'khz': 'KHz', \
+    'mhz': 'MHz', \
+    'ghz': 'GHz', \
+    'thz': 'THz' \
+    }
+datatypes = st.oneof(st.integers,st.floats,st.complex_numbers)
+# TODO: fix arguements for st.builds so that it generates correctly
+test_ntwk = st.builds(lambda x, y: rf.Network(
+    f=np.reshape(np.array(st.lists(st.oneof(st.integers, st.floats), min_size=x*x*y, max_size=x*x*y)), [x, x, y]),
+    s=np.array(st.lists(datatypes, min_size=x*x*y, max_size=x*x*y)),
+    z=np.reshape(np.array(datatypes, min_size=x*x*y, max_size=x*x*y), [x, x, y]),
+    name=st.characters,
+    comments=st.characters,
+    f_unit=st.sampled_from(['hz', 'khz', 'mhz', 'ghz']))
+    (st.integers(min_value=1, max_value=20), st.integers(min_value=0, max_value=100000)))
+
+
 
 class TouchstoneEncoder(json.JSONEncoder):
     def default(self, obj):
