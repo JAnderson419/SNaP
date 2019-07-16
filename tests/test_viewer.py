@@ -4,7 +4,8 @@ import numpy as np
 import skrf as rf
 from os.path import join, realpath, pardir, abspath
 
-import hypothesis.strategies as st
+from hypothesis import given, strategies as st
+from hypothesis.extra import numpy as stnp
 
 unit_dict = { \
     'hz': 'Hz', \
@@ -13,17 +14,24 @@ unit_dict = { \
     'ghz': 'GHz', \
     'thz': 'THz' \
     }
-datatypes = st.oneof(st.integers,st.floats,st.complex_numbers)
+datatypes = st.one_of(st.integers,st.floats,st.complex_numbers)
 # TODO: fix arguements for st.builds so that it generates correctly
-test_ntwk = st.builds(lambda x, y: rf.Network(
-    f=np.reshape(np.array(st.lists(st.oneof(st.integers, st.floats), min_size=x*x*y, max_size=x*x*y)), [x, x, y]),
-    s=np.array(st.lists(datatypes, min_size=x*x*y, max_size=x*x*y)),
-    z=np.reshape(np.array(datatypes, min_size=x*x*y, max_size=x*x*y), [x, x, y]),
-    name=st.characters,
-    comments=st.characters,
-    f_unit=st.sampled_from(['hz', 'khz', 'mhz', 'ghz']))
-    (st.integers(min_value=1, max_value=20), st.integers(min_value=0, max_value=100000)))
 
+
+def build_hypothesis_test_network(nports, npoints):
+    return st.builds(
+        rf.Network,
+        name=st.characters,
+        f=stnp.arrays(datatypes, [npoints]),
+        z0=stnp.arrays(datatypes, [st.sampled_from([nports, npoints])]),
+        s=stnp.arrays(datatypes, [npoints, nports, nports]),
+        comments=st.characters,
+        f_unit=st.sampled_from(['hz', 'khz', 'mhz', 'ghz'])
+    )
+
+test_ntwk = build_hypothesis_test_network(4,20)
+# test_ntwk = build_hypothesis_test_network(st.integers(min_value=1, max_value=20),
+#                                           st.integers(min_value=0, max_value=100000))
 
 
 class TouchstoneEncoder(json.JSONEncoder):
@@ -67,3 +75,8 @@ def test_snp_json_roundtrip():
     assert actual == given
     assert actual.frequency == given.frequency
     assert actual.name == given.name
+
+
+@given(test_ntwk)
+def test_random_snp(obj):
+    assert False
