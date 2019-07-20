@@ -1,0 +1,4 @@
+#!/bin/bash
+pip install -r jupyter-requirements.txt
+conda install -c conda-forge nodejs
+jupyter labextension install jupyterlab-dash

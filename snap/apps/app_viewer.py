@@ -46,27 +46,28 @@ layout = html.Div([
               [Input('tabs-example', 'value')])
 def render_content(tab):
     if tab == 'data-import':
-        return html.Div([dcc.Upload(
-                id='upload-data',
-                children=html.Div([
-                    'Drag and Drop or ',
-                    html.A('Select a Touchstone File'),
-                    ' (~20 MB max).'
-                ]),
-                style={
-                    'width': '100%',
-                    'height': '60px',
-                    'lineHeight': '60px',
-                    'borderWidth': '1px',
-                    'borderStyle': 'dashed',
-                    'borderRadius': '5px',
-                    'textAlign': 'center',
-                    'margin': '10px'
-                },
-                # Allow multiple files to be uploaded
-                multiple=True
-            ),
-            dcc.Loading(id="loading-upload", children=[html.Div(id='output-data-upload')], type="default"),])
+        return html.Div("In Development. Use other tab for now.")
+        # return html.Div([dcc.Upload(
+        #         id='upload-data',
+        #         children=html.Div([
+        #             'Drag and Drop or ',
+        #             html.A('Select a Touchstone File'),
+        #             ' (~20 MB max).'
+        #         ]),
+        #         style={
+        #             'width': '100%',
+        #             'height': '60px',
+        #             'lineHeight': '60px',
+        #             'borderWidth': '1px',
+        #             'borderStyle': 'dashed',
+        #             'borderRadius': '5px',
+        #             'textAlign': 'center',
+        #             'margin': '10px'
+        #         },
+        #         # Allow multiple files to be uploaded
+        #         multiple=True
+        #     ),
+        #     dcc.Loading(id="loading-upload", children=[html.Div(id='output-data-upload')], type="default"),])
     if tab == 'snp-viewer':
         return html.Div([
             # html.H3('S Parameter Viewer'),

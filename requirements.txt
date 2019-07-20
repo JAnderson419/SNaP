@@ -5,3 +5,4 @@ dash_html_components
 numpy
 dash
 scikit_rf
+Flask-Caching
