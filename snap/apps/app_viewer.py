@@ -6,6 +6,7 @@ Created on Tue Mar 26 14:59:14 2019
 """
 import base64
 import io
+import os
 import json
 import dash_table
 import numpy as np
@@ -15,111 +16,197 @@ import plotly.graph_objs as go
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output, State
+from flask_caching import Cache
+from uuid import uuid4
 
 from app import app
 
+cache = Cache(app.server, config={
+    'CACHE_TYPE': 'filesystem',
+    'CACHE_DIR': os.path.join(os.getcwd(),'cache'),
+    'CACHE_THRESHOLD': 20
+})
+
 write_snp = False
 
+col_header_test = ["m{}".format(i) for i in range(4)]
+
 layout = html.Div([
-    html.H3('S Parameter Viewer'),
-    dcc.Upload(
-        id='upload-data',
-        children=html.Div([
-            'Drag and Drop or ',
-            html.A('Select a Touchstone File'),
-            ' (~20 MB max).'
-        ]),
-        style={
-            'width': '100%',
-            'height': '60px',
-            'lineHeight': '60px',
-            'borderWidth': '1px',
-            'borderStyle': 'dashed',
-            'borderRadius': '5px',
-            'textAlign': 'center',
-            'margin': '10px'
-        },
-        # Allow multiple files to be uploaded
-        multiple=True
-    ),
-    dcc.Loading(id="loading-upload", children=[html.Div(id='output-data-upload')], type="default"),
-    html.Div(id='output-data-upload'),
-    html.Hr(),
-    html.Div([
-        html.Div([
-            html.Button('Plot', id='button'),
-            html.Details(id='parameter-control-div', open=True, children=[
-                html.Summary('Parameter Selection'),
-                html.Label('Parameter Type'),
-                dcc.RadioItems(
-                    id='parm-select',
-                    options=[
-                        {'label': 'S Parameters', 'value': 'S'},
-                        {'label': 'Y Parameters', 'value': 'Y'},
-                        {'label': 'Z Parameters', 'value': 'Z'}
-                        # {'label': 'ABCD Parameters', 'value': 'A'}
-                    ],
-                    value='S'),
-                html.Label('Plot Axes'),
-                dcc.RadioItems(
-                    id='axes-select',
-                    options=[
-                        {'label': 'Magnitude/Phase', 'value': 'MAG'},
-                        {'label': 'Real/Imaginary', 'value': 'RI'},
-                        {'label': 'Bode', 'value': 'Bode'}
-                    ],
-                    value='MAG')]),
-            html.Details(id='port-table-div', open=False, children=[
-                html.Summary('Port Selection'),
-                html.Div(
-                    dash_table.DataTable(
-                        id='port-table',
-                        css=[{
-                            'selector': '.dash-cell div.dash-cell-value',
-                            'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
-                        }],
-                        columns=[{"name": "Parameters",
-                                  "id": "Parameters"}],
-                        data=[],
-                        filtering=False,
-                        editable=False,
-                        sorting=False,
-                        row_selectable="multi",
-                        selected_rows=[],
-                    ),
-                )]
-                         ),
-            html.Hr(),
-            html.H4("Loading Status"),
-            html.H5("S:"),
-            dcc.Loading(id="loading-S",
-                        children=[html.Div(id='loaded-S-data')],
-                        type="default"),
-            html.H5("Y:"),
-            dcc.Loading(id="loading-Y",
-                        children=[html.Div(id='loaded-Y-data')],
-                        type="default"),
-            html.H5("Z:"),
-            dcc.Loading(id="loading-Z",
-                        children=[html.Div(id='loaded-Z-data')],
-                        type="default"),
-            html.H5("ABCD:"),
-            dcc.Loading(id="loading-A",
-                        children=[html.Div(id='loaded-A-data')],
-                        type="default"),
-        ], className="three columns"),
-        html.Div([
-            html.Div(id='output-plot'),
-            dcc.Loading(id="loading-plot",
-                        children=[html.Div(id='output-plot')],
-                        type="default")
-        ], className="nine columns")
-    ], className="row"),
-    html.Div(id='loaded-S-data', style={'display': 'none'}),
-    html.Div(id='loaded-Y-data', style={'display': 'none'}),
-    html.Div(id='loaded-Z-data', style={'display': 'none'}),
-    html.Div(id='loaded-A-data', style={'display': 'none'}),
+    dcc.Tabs(id="tabs-example", value='tab-1-example', children=[
+        dcc.Tab(label='Data Import', value='data-import'),
+        dcc.Tab(label='SnP Viewer', value='snp-viewer'),
+    ]),
+    html.Div(id='tabs-content-example'),
+    html.Div(id='uuid-hidden-div',
+             children=str(uuid4()),
+             style={'display': 'none'})
 ])
+
+@app.callback(Output('tabs-content-example', 'children'),
+              [Input('tabs-example', 'value')])
+def render_content(tab):
+    if tab == 'data-import':
+        return html.Div("In Development. Use other tab for now.")
+        # return html.Div([dcc.Upload(
+        #         id='upload-data',
+        #         children=html.Div([
+        #             'Drag and Drop or ',
+        #             html.A('Select a Touchstone File'),
+        #             ' (~20 MB max).'
+        #         ]),
+        #         style={
+        #             'width': '100%',
+        #             'height': '60px',
+        #             'lineHeight': '60px',
+        #             'borderWidth': '1px',
+        #             'borderStyle': 'dashed',
+        #             'borderRadius': '5px',
+        #             'textAlign': 'center',
+        #             'margin': '10px'
+        #         },
+        #         # Allow multiple files to be uploaded
+        #         multiple=True
+        #     ),
+        #     dcc.Loading(id="loading-upload", children=[html.Div(id='output-data-upload')], type="default"),])
+    if tab == 'snp-viewer':
+        return html.Div([
+            # html.H3('S Parameter Viewer'),
+            dcc.Upload(
+                id='upload-data',
+                children=html.Div([
+                    'Drag and Drop or ',
+                    html.A('Select a Touchstone File'),
+                    ' (~20 MB max).'
+                ]),
+                style={
+                    'width': '100%',
+                    'height': '60px',
+                    'lineHeight': '60px',
+                    'borderWidth': '1px',
+                    'borderStyle': 'dashed',
+                    'borderRadius': '5px',
+                    'textAlign': 'center',
+                    'margin': '10px'
+                },
+                # Allow multiple files to be uploaded
+                multiple=True
+            ),
+                dcc.Loading(id="loading-upload", children=[html.Div(id='output-data-upload')], type="default"),
+            html.Div(id='output-data-upload'),
+            html.Hr(),
+            html.Div([
+                html.Div([
+                    html.Button('Plot', id='button'),
+                    html.Details(id='parameter-control-div', open=True, children=[
+                        html.Summary('Parameter Selection'),
+                        html.Label('Parameter Type'),
+                        dcc.RadioItems(
+                            id='parm-select',
+                            options=[
+                                {'label': 'S Parameters', 'value': 'S'},
+                                {'label': 'Y Parameters', 'value': 'Y'},
+                                {'label': 'Z Parameters', 'value': 'Z'}
+                                # {'label': 'ABCD Parameters', 'value': 'A'}
+                            ],
+                            value='S'),
+                        html.Label('Plot Axes'),
+                        dcc.RadioItems(
+                            id='axes-select',
+                            options=[
+                                {'label': 'Magnitude/Phase', 'value': 'MAG'},
+                                {'label': 'Real/Imaginary', 'value': 'RI'},
+                                {'label': 'Bode', 'value': 'Bode'}
+                            ],
+                            value='MAG')]),
+                    html.Details(id='port-table-div', open=False, children=[
+                        html.Summary('Port Selection'),
+                        html.Div(
+                            dash_table.DataTable(
+                                id='port-table',
+                                css=[{
+                                    'selector': '.dash-cell div.dash-cell-value',
+                                    'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
+                                }],
+                                columns=[{"name": "Parameters",
+                                          "id": "Parameters"}],
+                                data=[],
+                                editable=False,
+                                row_selectable="multi",
+                                selected_rows=[],
+                            ),
+                        ),
+                        html.Div(
+                            dash_table.DataTable(
+                                id='port-table-test',
+                                css=[{
+                                    'selector': '.dash-cell div.dash-cell-value',
+                                    'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
+                                }],
+                                style_table={'overflowX': 'scroll'},
+                                columns=[{"name": i,
+                                          "id": i,
+                                          'presentation': 'dropdown'}
+                                         for i in col_header_test],
+                                data=[{i:j for i in col_header_test} for j in ['Plot']*len(col_header_test)],
+                                dropdown={
+                                    j: {
+                                        'options': [
+                                            {'label': i, 'value': i}
+                                            for i in ['Plot','Off']
+                                        ]
+                                    } for j in col_header_test},
+                                style_data_conditional=[
+                                    {
+                                        'if': {
+                                            'column_id': 'm0',
+                                            'filter_query': '{m0} contains "Plot"'
+                                        },
+                                        'backgroundColor': '#38af2c3',
+                                    }],
+                                # style_data_conditional=[
+                                #     {
+                                #         'if': {
+                                #             'column_id': i,
+                                #             'filter_query': '{{{}}} contains "l"'.format(i)
+                                #         },
+                                #         'backgroundColor': '#38af2c3',
+                                #     } for i in col_header_test],
+                                editable=True,
+                                selected_rows=[],
+                            ),
+                        )]
+                    ),
+                    html.Hr(),
+                    html.H4("Loading Status"),
+                    html.H5("S:"),
+                    dcc.Loading(id="loading-S",
+                                children=[html.Div(id='loaded-S-data')],
+                                type="default"),
+                    html.H5("Y:"),
+                    dcc.Loading(id="loading-Y",
+                                children=[html.Div(id='loaded-Y-data')],
+                                type="default"),
+                    html.H5("Z:"),
+                    dcc.Loading(id="loading-Z",
+                                children=[html.Div(id='loaded-Z-data')],
+                                type="default"),
+                    html.H5("ABCD:"),
+                    dcc.Loading(id="loading-A",
+                                children=[html.Div(id='loaded-A-data')],
+                                type="default"),
+                ], className="three columns"),
+                html.Div([
+                    html.Div(id='output-plot'),
+                    dcc.Loading(id="loading-plot",
+                                children=[html.Div(id='output-plot')],
+                                type="default")
+                ], className="nine columns")
+            ], className="row"),
+            html.Div(id='loaded-S-data', style={'display': 'none'}),
+            html.Div(id='loaded-Y-data', style={'display': 'none'}),
+            html.Div(id='loaded-Z-data', style={'display': 'none'}),
+            html.Div(id='loaded-A-data', style={'display': 'none'}),
+        ])
 
 
 class TouchstoneEncoder(json.JSONEncoder):
@@ -132,9 +219,11 @@ class TouchstoneEncoder(json.JSONEncoder):
             return obj.f.tolist()
         return json.JSONEncoder.default(self, obj)
 
+def to_json(network):
+    return json.dumps(network, cls=TouchstoneEncoder)
 
 def from_json(obj):
-    ntwk = rf.Network()
+    ntwk = rf.Network(f_unit='hz')
     ntwk.name = obj['name']
     ntwk.comments = obj['comments']
     ntwk.port_names = obj['port_names']

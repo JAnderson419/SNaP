@@ -10,6 +10,25 @@ import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output
 
+def isnotebook():
+    '''
+    Check if in jupyterlab environment.
+
+    From https://stackoverflow.com/questions/15411967/how-can-i-check-if-code-is-executed-in-the-ipython-notebook
+    '''
+    try:
+        shell = get_ipython().__class__.__name__
+        if shell == 'ZMQInteractiveShell':
+            return True   # Jupyter notebook or qtconsole
+        elif shell == 'TerminalInteractiveShell':
+            return False  # Terminal running IPython
+        else:
+            return False  # Other type (?)
+    except NameError:
+        return False      # Probably standard Python interpreter
+
+
+in_jupyterlab = isnotebook()
 hubzero = False
 auth_on = True
 flask_debug = False
@@ -28,8 +47,13 @@ if hubzero:
     from hubzeroapp import app
 
     if auth_on: check_access(app)
+elif in_jupyterlab:
+    import jupyterlab_dash
+    viewer = jupyterlab_dash.AppViewer()
+    from app import app
 else:
     from app import app
+
 from apps import app_viewer
 
 if flask_debug:
@@ -80,9 +104,12 @@ def display_page(pathname):
             ),
         ])
 
-if __name__ == '__main__':
+
+def main():
     if hubzero:
         app.run_server(port=8000, host='0.0.0.0')
+    elif in_jupyterlab:
+        viewer.show(app)
     else:
         if flask_debug:
             print(join(dirname(dirname(realpath(__file__))), 'debug'))
@@ -93,3 +120,7 @@ if __name__ == '__main__':
             app.run_server(debug=False)
         else:
             app.run_server(debug=True)
+
+
+if __name__ == '__main__':
+    main()
