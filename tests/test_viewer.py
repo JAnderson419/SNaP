@@ -7,32 +7,37 @@ from os.path import join, realpath, pardir, abspath
 from hypothesis import given, strategies as st
 from hypothesis.extra import numpy as stnp
 
-unit_dict = { \
-    'hz': 'Hz', \
-    'khz': 'KHz', \
-    'mhz': 'MHz', \
-    'ghz': 'GHz', \
-    'thz': 'THz' \
-    }
-datatypes = st.one_of(st.integers,st.floats,st.complex_numbers)
-# TODO: fix arguements for st.builds so that it generates correctly
 
-
-def build_hypothesis_test_network(nports, npoints):
-    return st.builds(
-        rf.Network,
-        name=st.characters,
-        f=stnp.arrays(datatypes, [npoints]),
-        z0=stnp.arrays(datatypes, [st.sampled_from([nports, npoints])]),
-        s=stnp.arrays(datatypes, [npoints, nports, nports]),
-        comments=st.characters,
-        f_unit=st.sampled_from(['hz', 'khz', 'mhz', 'ghz'])
-    )
-
-test_ntwk = build_hypothesis_test_network(4,20)
-# test_ntwk = build_hypothesis_test_network(st.integers(min_value=1, max_value=20),
-#                                           st.integers(min_value=0, max_value=100000))
-
+# unit_dict = { \
+#     'hz': 'Hz', \
+#     'khz': 'KHz', \
+#     'mhz': 'MHz', \
+#     'ghz': 'GHz', \
+#     'thz': 'THz' \
+#     }
+# datatypes = st.one_of(st.integers,st.floats,st.complex_numbers)
+# # TODO: fix arguements for st.builds so that it generates correctly
+#
+#
+# def build_hypothesis_test_network(nports, npoints):
+#     return st.builds(
+#         rf.Network,
+#         name=st.characters,
+#         f=stnp.arrays(datatypes, [npoints]),
+#         z0=stnp.arrays(datatypes, [st.sampled_from([nports, npoints])]),
+#         s=stnp.arrays(datatypes, [npoints, nports, nports]),
+#         comments=st.characters,
+#         f_unit=st.sampled_from(['hz', 'khz', 'mhz', 'ghz'])
+#     )
+#
+# test_ntwk = build_hypothesis_test_network(4,20)
+# # test_ntwk = build_hypothesis_test_network(st.integers(min_value=1, max_value=20),
+# #                                           st.integers(min_value=0, max_value=100000))
+#
+#
+# @given(test_ntwk)
+# def test_random_snp(obj):
+#     assert False
 
 class TouchstoneEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -76,7 +81,3 @@ def test_snp_json_roundtrip():
     assert actual.frequency == given.frequency
     assert actual.name == given.name
 
-
-@given(test_ntwk)
-def test_random_snp(obj):
-    assert False
