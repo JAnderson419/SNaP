@@ -23,7 +23,7 @@ from app import app
 
 cache = Cache(app.server, config={
     'CACHE_TYPE': 'filesystem',
-    'CACHE_DIR': os.path.join(os.getcwd(),'cache'),
+    'CACHE_DIR': os.path.join(os.getcwd(), 'cache'),
     'CACHE_THRESHOLD': 20
 })
 
@@ -32,68 +32,99 @@ write_snp = False
 col_header_test = ["m{}".format(i) for i in range(4)]
 
 layout = html.Div([
-    dcc.Tabs(id="tabs-example", value='tab-1-example', children=[
+    dcc.Tabs(id="tabs-example", value='data-import', children=[
         dcc.Tab(label='Data Import', value='data-import'),
         dcc.Tab(label='SnP Viewer', value='snp-viewer'),
     ]),
-    html.Div(id='tabs-content-example'),
+
+    html.Div([
+        html.Div(
+            [
+                html.Div(id='output-data-upload'),
+                dcc.Loading(id="loading-upload",
+                            children=[html.Div(id='output-data-upload')],
+                            type="default"),
+                html.H4("Loading Status"),
+                html.H5("S:"),
+                dcc.Loading(id="loading-S",
+                            children=[html.Div(id='loaded-S-data')],
+                            type="default"),
+                # html.H5("Y:"),
+                # dcc.Loading(id="loading-Y",
+                #             children=[html.Div(id='loaded-Y-data')],
+                #             type="default"),
+                # html.H5("Z:"),
+                # dcc.Loading(id="loading-Z",
+                #             children=[html.Div(id='loaded-Z-data')],
+                #             type="default"),
+                # html.H5("ABCD:"),
+                # dcc.Loading(id="loading-A",
+                #             children=[html.Div(id='loaded-A-data')],
+                #             type="default"),
+            ], className="two columns", style={'word-wrap': 'break-word'}
+        ),
+        html.Div(id='tabs-content', className='ten columns'), ], className='row'
+    ),
+    html.Div(id='loaded-S-data', style={'display': 'none'}),
+    # html.Div(id='loaded-Y-data', style={'display': 'none'}),
+    # html.Div(id='loaded-Z-data', style={'display': 'none'}),
+    # html.Div(id='loaded-A-data', style={'display': 'none'}),
     html.Div(id='uuid-hidden-div',
              children=str(uuid4()),
              style={'display': 'none'})
 ])
 
-@app.callback(Output('tabs-content-example', 'children'),
+
+@app.callback(Output('tabs-content', 'children'),
               [Input('tabs-example', 'value')])
 def render_content(tab):
     if tab == 'data-import':
-        return html.Div("In Development. Use other tab for now.")
-        # return html.Div([dcc.Upload(
-        #         id='upload-data',
-        #         children=html.Div([
-        #             'Drag and Drop or ',
-        #             html.A('Select a Touchstone File'),
-        #             ' (~20 MB max).'
-        #         ]),
-        #         style={
-        #             'width': '100%',
-        #             'height': '60px',
-        #             'lineHeight': '60px',
-        #             'borderWidth': '1px',
-        #             'borderStyle': 'dashed',
-        #             'borderRadius': '5px',
-        #             'textAlign': 'center',
-        #             'margin': '10px'
-        #         },
-        #         # Allow multiple files to be uploaded
-        #         multiple=True
-        #     ),
-        #     dcc.Loading(id="loading-upload", children=[html.Div(id='output-data-upload')], type="default"),])
+        # return html.Div("In Development. Use other tab for now.")
+        return html.Div([dcc.Upload(
+            id='upload-data',
+            children=html.Div([
+                'Drag and Drop or ',
+                html.A('Select a Touchstone File'),
+                ' (~20 MB max).'
+            ]),
+            style={
+                'width': '100%',
+                'height': '60px',
+                'lineHeight': '60px',
+                'borderWidth': '1px',
+                'borderStyle': 'dashed',
+                'borderRadius': '5px',
+                'textAlign': 'center',
+                'margin': '10px'
+            },
+            # Allow multiple files to be uploaded
+            multiple=True
+        ),
+        ])
     if tab == 'snp-viewer':
         return html.Div([
-            # html.H3('S Parameter Viewer'),
-            dcc.Upload(
-                id='upload-data',
-                children=html.Div([
-                    'Drag and Drop or ',
-                    html.A('Select a Touchstone File'),
-                    ' (~20 MB max).'
-                ]),
-                style={
-                    'width': '100%',
-                    'height': '60px',
-                    'lineHeight': '60px',
-                    'borderWidth': '1px',
-                    'borderStyle': 'dashed',
-                    'borderRadius': '5px',
-                    'textAlign': 'center',
-                    'margin': '10px'
-                },
-                # Allow multiple files to be uploaded
-                multiple=True
-            ),
-                dcc.Loading(id="loading-upload", children=[html.Div(id='output-data-upload')], type="default"),
-            html.Div(id='output-data-upload'),
-            html.Hr(),
+            # # html.H3('S Parameter Viewer'),
+            # dcc.Upload(
+            #     id='upload-data',
+            #     children=html.Div([
+            #         'Drag and Drop or ',
+            #         html.A('Select a Touchstone File'),
+            #         ' (~20 MB max).'
+            #     ]),
+            #     style={
+            #         'width': '100%',
+            #         'height': '60px',
+            #         'lineHeight': '60px',
+            #         'borderWidth': '1px',
+            #         'borderStyle': 'dashed',
+            #         'borderRadius': '5px',
+            #         'textAlign': 'center',
+            #         'margin': '10px'
+            #     },
+            #     # Allow multiple files to be uploaded
+            #     multiple=True
+            # ),
+            #     dcc.Loading(id="loading-upload", children=[html.Div(id='output-data-upload')], type="default"),
             html.Div([
                 html.Div([
                     html.Button('Plot', id='button'),
@@ -118,7 +149,7 @@ def render_content(tab):
                                 {'label': 'Bode', 'value': 'Bode'}
                             ],
                             value='MAG')]),
-                    html.Details(id='port-table-div', open=False, children=[
+                    html.Details(id='port-table-div', children=[
                         html.Summary('Port Selection'),
                         html.Div(
                             dash_table.DataTable(
@@ -129,71 +160,55 @@ def render_content(tab):
                                 }],
                                 columns=[{"name": "Parameters",
                                           "id": "Parameters"}],
-                                data=[],
+                                # data=[],
                                 editable=False,
                                 row_selectable="multi",
                                 selected_rows=[],
                             ),
                         ),
-                        html.Div(
-                            dash_table.DataTable(
-                                id='port-table-test',
-                                css=[{
-                                    'selector': '.dash-cell div.dash-cell-value',
-                                    'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
-                                }],
-                                style_table={'overflowX': 'scroll'},
-                                columns=[{"name": i,
-                                          "id": i,
-                                          'presentation': 'dropdown'}
-                                         for i in col_header_test],
-                                data=[{i:j for i in col_header_test} for j in ['Plot']*len(col_header_test)],
-                                dropdown={
-                                    j: {
-                                        'options': [
-                                            {'label': i, 'value': i}
-                                            for i in ['Plot','Off']
-                                        ]
-                                    } for j in col_header_test},
-                                style_data_conditional=[
-                                    {
-                                        'if': {
-                                            'column_id': 'm0',
-                                            'filter_query': '{m0} contains "Plot"'
-                                        },
-                                        'backgroundColor': '#38af2c3',
-                                    }],
-                                # style_data_conditional=[
-                                #     {
-                                #         'if': {
-                                #             'column_id': i,
-                                #             'filter_query': '{{{}}} contains "l"'.format(i)
-                                #         },
-                                #         'backgroundColor': '#38af2c3',
-                                #     } for i in col_header_test],
-                                editable=True,
-                                selected_rows=[],
-                            ),
-                        )]
-                    ),
-                    html.Hr(),
-                    html.H4("Loading Status"),
-                    html.H5("S:"),
-                    dcc.Loading(id="loading-S",
-                                children=[html.Div(id='loaded-S-data')],
-                                type="default"),
-                    html.H5("Y:"),
-                    dcc.Loading(id="loading-Y",
-                                children=[html.Div(id='loaded-Y-data')],
-                                type="default"),
-                    html.H5("Z:"),
-                    dcc.Loading(id="loading-Z",
-                                children=[html.Div(id='loaded-Z-data')],
-                                type="default"),
-                    html.H5("ABCD:"),
-                    dcc.Loading(id="loading-A",
-                                children=[html.Div(id='loaded-A-data')],
-                                type="default"),
+                        # html.Div(
+                        #     dash_table.DataTable(
+                        #         id='port-table-test',
+                        #         css=[{
+                        #             'selector': '.dash-cell div.dash-cell-value',
+                        #             'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
+                        #         }],
+                        #         style_table={'overflowX': 'scroll'},
+                        #         columns=[{"name": i,
+                        #                   "id": i,
+                        #                   'presentation': 'dropdown'}
+                        #                  for i in col_header_test],
+                        #         data=[{i:j for i in col_header_test} for j in ['Plot']*len(col_header_test)],
+                        #         dropdown={
+                        #             j: {
+                        #                 'options': [
+                        #                     {'label': i, 'value': i}
+                        #                     for i in ['Plot','Off']
+                        #                 ]
+                        #             } for j in col_header_test},
+                        #         style_data_conditional=[
+                        #             {
+                        #                 'if': {
+                        #                     'column_id': 'm0',
+                        #                     'filter_query': '{m0} contains "Plot"'
+                        #                 },
+                        #                 'backgroundColor': '#38af2c3',
+                        #             }],
+                        #         # style_data_conditional=[
+                        #         #     {
+                        #         #         'if': {
+                        #         #             'column_id': i,
+                        #         #             'filter_query': '{{{}}} contains "l"'.format(i)
+                        #         #         },
+                        #         #         'backgroundColor': '#38af2c3',
+                        #         #     } for i in col_header_test],
+                        #         editable=True,
+                        #         selected_rows=[],
+                        #     ),
+                        # )
+                    ]
+                                 ),
+                    # html.Hr(),
                 ], className="three columns"),
                 html.Div([
                     html.Div(id='output-plot'),
@@ -202,10 +217,6 @@ def render_content(tab):
                                 type="default")
                 ], className="nine columns")
             ], className="row"),
-            html.Div(id='loaded-S-data', style={'display': 'none'}),
-            html.Div(id='loaded-Y-data', style={'display': 'none'}),
-            html.Div(id='loaded-Z-data', style={'display': 'none'}),
-            html.Div(id='loaded-A-data', style={'display': 'none'}),
         ])
 
 
@@ -274,10 +285,34 @@ def load_touchstone(content_string: str, filename: str) -> rf.Network:
     return d
 
 
-@app.callback([Output('output-data-upload', 'children'),
-               Output('loaded-S-data', 'children'),
-               Output('port-table-div', 'open'),
+@app.callback([Output('port-table-div', 'open'),
                Output('port-table', 'data')],
+              # [Input('tabs-example', 'value')],
+              # [State('output-data-upload', 'children')])
+              [Input('button', 'n_clicks')],
+              [State('loaded-S-data', 'children')])
+def update_port_table(_, json_data):
+    if not json_data:
+        return False, []
+    else:
+        maxports = 0
+        data = json.loads(json_data['props']['children'])
+        for key, val in data.items():
+            if write_snp:
+                ntwk = load_touchstone(val.encode(), key)
+            else:
+                ntwk = from_json(val)
+            if maxports < ntwk.nports:
+                maxports = ntwk.nports
+        ports = []
+        for i in range(maxports):
+            for j in range(maxports):
+                ports.append({"Parameters": '{}{}'.format(i + 1, j + 1)})
+        return True, ports
+
+
+@app.callback([Output('output-data-upload', 'children'),
+               Output('loaded-S-data', 'children')],
               [Input('upload-data', 'contents')],
               [State('upload-data', 'filename'),
                State('upload-data', 'last_modified')])
@@ -304,101 +339,98 @@ def update_s_output(list_of_contents, list_of_names, list_of_dates):
                         html.Div([]))
             ch.append((html.Div([
                 html.Div(data.__str__()),
+                html.Hr()
             ])))
             if write_snp:
                 d[n] = data.write_touchstone(return_string=True)
             else:
                 d[n] = data.__dict__
-            if ports == []:
-                for i in range(len(data.s[0, :, 0])):
-                    for j in range(len(data.s[0, 0, :])):
-                        ports.append({"Parameters": '{}{}'.format(i + 1, j + 1)})
 
-        return ch, html.Div(json.dumps(d, cls=TouchstoneEncoder)), True, ports
+        return ch, html.Div(json.dumps(d, cls=TouchstoneEncoder))
 
 
-@app.callback(Output('loaded-Y-data', 'children'),
-              [Input('upload-data', 'contents')],
-              [State('upload-data', 'filename'),
-               State('upload-data', 'last_modified')])
-def update_y_output(list_of_contents, list_of_names, list_of_dates):
-    if list_of_contents is not None:
-        d = {}
-        content_type = []
-        content_string = []
-        for i, c in enumerate(list_of_contents):
-            ct, cs = c.split(',')
-            content_type.append(ct)
-            content_string.append(cs)
-        for c, n in zip(content_string, list_of_names):
-            decoded = base64.b64decode(c)
-            try:
-                data = load_touchstone(decoded, n)
-            except Exception as e:
-                print(e)
-                return html.Div([])
-            data.s = data.y
-            if write_snp:
-                d[n] = data.write_touchstone(return_string=True)
-            else:
-                d[n] = data.__dict__
-        return html.Div(json.dumps(d, cls=TouchstoneEncoder))
-
-
-@app.callback(Output('loaded-Z-data', 'children'),
-              [Input('upload-data', 'contents')],
-              [State('upload-data', 'filename'),
-               State('upload-data', 'last_modified')])
-def update_z_output(list_of_contents, list_of_names, list_of_dates):
-    if list_of_contents is not None:
-        d = {}
-        content_type = []
-        content_string = []
-        for i, c in enumerate(list_of_contents):
-            ct, cs = c.split(',')
-            content_type.append(ct)
-            content_string.append(cs)
-        for c, n in zip(content_string, list_of_names):
-            decoded = base64.b64decode(c)
-            try:
-                data = load_touchstone(decoded, n)
-            except Exception as e:
-                print(e)
-                return html.Div([])
-            data.s = data.z
-            if write_snp:
-                d[n] = data.write_touchstone(return_string=True)
-            else:
-                d[n] = data.__dict__
-        return html.Div(json.dumps(d, cls=TouchstoneEncoder))
-
-
-@app.callback(Output('loaded-A-data', 'children'),
-              [Input('upload-data', 'contents')],
-              [State('upload-data', 'filename'),
-               State('upload-data', 'last_modified')])
-def update_a_output(list_of_contents, list_of_names, list_of_dates):
-    if list_of_contents is not None:
-        d = {}
-        content_type = []
-        content_string = []
-        for i, c in enumerate(list_of_contents):
-            ct, cs = c.split(',')
-            content_type.append(ct)
-            content_string.append(cs)
-        for c, n in zip(content_string, list_of_names):
-            decoded = base64.b64decode(c)
-            try:
-                data = load_touchstone(decoded, n)
-            except Exception as e:
-                print(e)
-                return html.Div([])
-            data.s = data.a
-            if write_snp:
-                d[n] = data.write_touchstone(return_string=True)
-            else:
-                d[n] = data.__dict__
-        return html.Div(json.dumps(d, cls=TouchstoneEncoder))
+# @app.callback(Output('loaded-Y-data', 'children'),
+#               [Input('upload-data', 'contents')],
+#               [State('upload-data', 'filename'),
+#                State('upload-data', 'last_modified')])
+# def update_y_output(list_of_contents, list_of_names, list_of_dates):
+#     if list_of_contents is not None:
+#         d = {}
+#         content_type = []
+#         content_string = []
+#         for i, c in enumerate(list_of_contents):
+#             ct, cs = c.split(',')
+#             content_type.append(ct)
+#             content_string.append(cs)
+#         for c, n in zip(content_string, list_of_names):
+#             decoded = base64.b64decode(c)
+#             try:
+#                 data = load_touchstone(decoded, n)
+#             except Exception as e:
+#                 print(e)
+#                 return html.Div([])
+#             data.s = data.y
+#             if write_snp:
+#                 d[n] = data.write_touchstone(return_string=True)
+#             else:
+#                 d[n] = data.__dict__
+#         return html.Div(json.dumps(d, cls=TouchstoneEncoder))
+#
+#
+# @app.callback(Output('loaded-Z-data', 'children'),
+#               [Input('upload-data', 'contents')],
+#               [State('upload-data', 'filename'),
+#                State('upload-data', 'last_modified')])
+# def update_z_output(list_of_contents, list_of_names, list_of_dates):
+#     if list_of_contents is not None:
+#         d = {}
+#         content_type = []
+#         content_string = []
+#         for i, c in enumerate(list_of_contents):
+#             ct, cs = c.split(',')
+#             content_type.append(ct)
+#             content_string.append(cs)
+#         for c, n in zip(content_string, list_of_names):
+#             decoded = base64.b64decode(c)
+#             try:
+#                 data = load_touchstone(decoded, n)
+#             except Exception as e:
+#                 print(e)
+#                 return html.Div([])
+#             data.s = data.z
+#             if write_snp:
+#                 d[n] = data.write_touchstone(return_string=True)
+#             else:
+#                 d[n] = data.__dict__
+#         return html.Div(json.dumps(d, cls=TouchstoneEncoder))
+#
+#
+# @app.callback(Output('loaded-A-data', 'children'),
+#               [Input('upload-data', 'contents')],
+#               [State('upload-data', 'filename'),
+#                State('upload-data', 'last_modified')])
+# def update_a_output(list_of_contents, list_of_names, list_of_dates):
+#     if list_of_contents is not None:
+#         d = {}
+#         content_type = []
+#         content_string = []
+#         for i, c in enumerate(list_of_contents):
+#             ct, cs = c.split(',')
+#             content_type.append(ct)
+#             content_string.append(cs)
+#         for c, n in zip(content_string, list_of_names):
+#             decoded = base64.b64decode(c)
+#             try:
+#                 data = load_touchstone(decoded, n)
+#             except Exception as e:
+#                 print(e)
+#                 return html.Div([])
+#             data.s = data.a
+#             if write_snp:
+#                 d[n] = data.write_touchstone(return_string=True)
+#             else:
+#                 d[n] = data.__dict__
+#         return html.Div(json.dumps(d, cls=TouchstoneEncoder))
 
 
 @app.callback(
@@ -410,24 +442,29 @@ def update_a_output(list_of_contents, list_of_names, list_of_dates):
      State('port-table', "derived_virtual_selected_rows"),
      State('port-table', "derived_virtual_data"),
      State('loaded-S-data', 'children'),
-     State('loaded-Y-data', 'children'),
-     State('loaded-Z-data', 'children'),
-     State('loaded-A-data', 'children')])
-def update_graph(n_clicks, parm, axes_format, selected_rows, selected_data, s_data, y_data, z_data, a_data):
-    json_data = None
-    if parm == 'S':
-        json_data = s_data
-    elif parm == 'Y':
-        json_data = y_data
-    elif parm == 'Z':
-        json_data = z_data
-    elif parm == 'A':
-        json_data = a_data
-    else:
-        return html.Div(children="Unrecognized Parameter.")
+     # State('loaded-Y-data', 'children'),
+     # State('loaded-Z-data', 'children'),
+     # State('loaded-A-data', 'children'),
+     ])
+def update_graph(n_clicks, parm, axes_format, selected_rows, selected_data,
+                 s_data):  # , y_data, z_data, a_data):
+    json_data = s_data
+    # json_data = None
+    # if parm == 'S':
+    # json_data = s_data
+    # elif parm == 'Y':
+    # json_data = y_data
+    # elif parm == 'Z':
+    # json_data = z_data
+    # elif parm == 'A':
+    # json_data = a_data
+    # else:
+    #     return html.Div(children="Unrecognized Parameter.")
 
     if json_data is None or json_data == []:
         return html.Div(children='Please Upload Data to Plot.')
+    elif not selected_rows:
+        return html.Div(children='Please Select Ports to Plot.')
     else:
         traces1 = []
         traces2 = []
@@ -439,6 +476,14 @@ def update_graph(n_clicks, parm, axes_format, selected_rows, selected_data, s_da
                 ntwk = load_touchstone(val.encode(), key)
             else:
                 ntwk = from_json(val)
+            if parm == 'S':
+                pass
+            elif parm == 'Y':
+                ntwk.s = ntwk.y
+            elif parm == 'Z':
+                ntwk.s = ntwk.z
+            elif parm == 'A':
+                ntwk.s = ntwk.a
             for i in range(len(ntwk.s[0, :, 0])):
                 for j in range(len(ntwk.s[0, 0, :])):
                     for k in selected_rows:
