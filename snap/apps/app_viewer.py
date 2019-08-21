@@ -40,15 +40,17 @@ layout = html.Div([
     html.Div([
         html.Div(
             [
+                html.H4("Loaded Data:"),
+                html.Hr(),
                 html.Div(id='output-data-upload'),
                 dcc.Loading(id="loading-upload",
                             children=[html.Div(id='output-data-upload')],
                             type="default"),
-                html.H4("Loading Status"),
-                html.H5("S:"),
-                dcc.Loading(id="loading-S",
-                            children=[html.Div(id='loaded-S-data')],
-                            type="default"),
+                # html.H4("Loading Status"),
+                # html.H5("S:"),
+                # dcc.Loading(id="loading-S",
+                #             children=[html.Div(id='loaded-S-data')],
+                #             type="default"),
                 # html.H5("Y:"),
                 # dcc.Loading(id="loading-Y",
                 #             children=[html.Div(id='loaded-Y-data')],
@@ -61,14 +63,11 @@ layout = html.Div([
                 # dcc.Loading(id="loading-A",
                 #             children=[html.Div(id='loaded-A-data')],
                 #             type="default"),
-            ], className="two columns", style={'word-wrap': 'break-word'}
+            ], className="two columns", style={'word-wrap': 'break-word'},
         ),
         html.Div(id='tabs-content', className='ten columns'), ], className='row'
     ),
     html.Div(id='loaded-S-data', style={'display': 'none'}),
-    # html.Div(id='loaded-Y-data', style={'display': 'none'}),
-    # html.Div(id='loaded-Z-data', style={'display': 'none'}),
-    # html.Div(id='loaded-A-data', style={'display': 'none'}),
     html.Div(id='uuid-hidden-div',
              children=str(uuid4()),
              style={'display': 'none'})
@@ -348,91 +347,6 @@ def update_s_output(list_of_contents, list_of_names, list_of_dates):
 
         return ch, html.Div(json.dumps(d, cls=TouchstoneEncoder))
 
-
-# @app.callback(Output('loaded-Y-data', 'children'),
-#               [Input('upload-data', 'contents')],
-#               [State('upload-data', 'filename'),
-#                State('upload-data', 'last_modified')])
-# def update_y_output(list_of_contents, list_of_names, list_of_dates):
-#     if list_of_contents is not None:
-#         d = {}
-#         content_type = []
-#         content_string = []
-#         for i, c in enumerate(list_of_contents):
-#             ct, cs = c.split(',')
-#             content_type.append(ct)
-#             content_string.append(cs)
-#         for c, n in zip(content_string, list_of_names):
-#             decoded = base64.b64decode(c)
-#             try:
-#                 data = load_touchstone(decoded, n)
-#             except Exception as e:
-#                 print(e)
-#                 return html.Div([])
-#             data.s = data.y
-#             if write_snp:
-#                 d[n] = data.write_touchstone(return_string=True)
-#             else:
-#                 d[n] = data.__dict__
-#         return html.Div(json.dumps(d, cls=TouchstoneEncoder))
-#
-#
-# @app.callback(Output('loaded-Z-data', 'children'),
-#               [Input('upload-data', 'contents')],
-#               [State('upload-data', 'filename'),
-#                State('upload-data', 'last_modified')])
-# def update_z_output(list_of_contents, list_of_names, list_of_dates):
-#     if list_of_contents is not None:
-#         d = {}
-#         content_type = []
-#         content_string = []
-#         for i, c in enumerate(list_of_contents):
-#             ct, cs = c.split(',')
-#             content_type.append(ct)
-#             content_string.append(cs)
-#         for c, n in zip(content_string, list_of_names):
-#             decoded = base64.b64decode(c)
-#             try:
-#                 data = load_touchstone(decoded, n)
-#             except Exception as e:
-#                 print(e)
-#                 return html.Div([])
-#             data.s = data.z
-#             if write_snp:
-#                 d[n] = data.write_touchstone(return_string=True)
-#             else:
-#                 d[n] = data.__dict__
-#         return html.Div(json.dumps(d, cls=TouchstoneEncoder))
-#
-#
-# @app.callback(Output('loaded-A-data', 'children'),
-#               [Input('upload-data', 'contents')],
-#               [State('upload-data', 'filename'),
-#                State('upload-data', 'last_modified')])
-# def update_a_output(list_of_contents, list_of_names, list_of_dates):
-#     if list_of_contents is not None:
-#         d = {}
-#         content_type = []
-#         content_string = []
-#         for i, c in enumerate(list_of_contents):
-#             ct, cs = c.split(',')
-#             content_type.append(ct)
-#             content_string.append(cs)
-#         for c, n in zip(content_string, list_of_names):
-#             decoded = base64.b64decode(c)
-#             try:
-#                 data = load_touchstone(decoded, n)
-#             except Exception as e:
-#                 print(e)
-#                 return html.Div([])
-#             data.s = data.a
-#             if write_snp:
-#                 d[n] = data.write_touchstone(return_string=True)
-#             else:
-#                 d[n] = data.__dict__
-#         return html.Div(json.dumps(d, cls=TouchstoneEncoder))
-
-
 @app.callback(
     Output('output-plot', "children"),
     [Input('button', 'n_clicks')],
@@ -442,25 +356,9 @@ def update_s_output(list_of_contents, list_of_names, list_of_dates):
      State('port-table', "derived_virtual_selected_rows"),
      State('port-table', "derived_virtual_data"),
      State('loaded-S-data', 'children'),
-     # State('loaded-Y-data', 'children'),
-     # State('loaded-Z-data', 'children'),
-     # State('loaded-A-data', 'children'),
      ])
-def update_graph(n_clicks, parm, axes_format, selected_rows, selected_data,
-                 s_data):  # , y_data, z_data, a_data):
+def update_graph(n_clicks, parm, axes_format, selected_rows, selected_data, s_data):
     json_data = s_data
-    # json_data = None
-    # if parm == 'S':
-    # json_data = s_data
-    # elif parm == 'Y':
-    # json_data = y_data
-    # elif parm == 'Z':
-    # json_data = z_data
-    # elif parm == 'A':
-    # json_data = a_data
-    # else:
-    #     return html.Div(children="Unrecognized Parameter.")
-
     if json_data is None or json_data == []:
         return html.Div(children='Please Upload Data to Plot.')
     elif not selected_rows:
@@ -559,8 +457,6 @@ def update_graph(n_clicks, parm, axes_format, selected_rows, selected_data,
         elif axes_format == "Bode":
             # See https://github.com/4QuantOSS/DashIntro/blob/master/notebooks/Tutorial.ipynb
             # for example of encoding mpl figure to image for dash
-
-            # return html.Div("Option Under Development.")
             fig = plt.figure()
             ax1 = fig.add_subplot(111)
             legend_entry = []
