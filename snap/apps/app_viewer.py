@@ -8,6 +8,8 @@ import base64
 import io
 import os
 import json
+import re
+
 import dash_table
 import numpy as np
 import matplotlib.pyplot as plt
@@ -42,30 +44,34 @@ layout = html.Div([
             [
                 html.H4("Loaded Data:"),
                 html.Hr(),
-                html.Div(id='output-data-upload'),
+                html.Div(
+                    dash_table.DataTable(
+                        id='uploaded-data-table',
+                        style_cell={
+                            'whiteSpace': 'normal',
+                            'textAlign': 'left'
+                        },
+                        style_table={
+                            'table-layout': 'fixed',
+                            'width': '100%',
+                        },
+                        css=[{
+                            'selector': '.dash-cell div.dash-cell-value',
+                            'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
+                        }],
+                        columns=[{"name": "Loaded Networks",
+                                  "id": "data"}],
+                        editable=False,
+                        row_selectable="multi",
+                        selected_rows=[],
+                    ), style={'overflowX': 'auto'}
+                ),
                 dcc.Loading(id="loading-upload",
-                            children=[html.Div(id='output-data-upload')],
+                            children=[html.Div(id='loaded-S-data')],
                             type="default"),
-                # html.H4("Loading Status"),
-                # html.H5("S:"),
-                # dcc.Loading(id="loading-S",
-                #             children=[html.Div(id='loaded-S-data')],
-                #             type="default"),
-                # html.H5("Y:"),
-                # dcc.Loading(id="loading-Y",
-                #             children=[html.Div(id='loaded-Y-data')],
-                #             type="default"),
-                # html.H5("Z:"),
-                # dcc.Loading(id="loading-Z",
-                #             children=[html.Div(id='loaded-Z-data')],
-                #             type="default"),
-                # html.H5("ABCD:"),
-                # dcc.Loading(id="loading-A",
-                #             children=[html.Div(id='loaded-A-data')],
-                #             type="default"),
-            ], className="two columns", style={'word-wrap': 'break-word'},
+            ], className='three columns', style={'word-wrap': 'break-word'},
         ),
-        html.Div(id='tabs-content', className='ten columns'), ], className='row'
+        html.Div(id='tabs-content', className='nine columns'), ], className='row'
     ),
     html.Div(id='loaded-S-data', style={'display': 'none'}),
     html.Div(id='uuid-hidden-div',
@@ -78,7 +84,6 @@ layout = html.Div([
               [Input('tabs-example', 'value')])
 def render_content(tab):
     if tab == 'data-import':
-        # return html.Div("In Development. Use other tab for now.")
         return html.Div([dcc.Upload(
             id='upload-data',
             children=html.Div([
@@ -102,28 +107,6 @@ def render_content(tab):
         ])
     if tab == 'snp-viewer':
         return html.Div([
-            # # html.H3('S Parameter Viewer'),
-            # dcc.Upload(
-            #     id='upload-data',
-            #     children=html.Div([
-            #         'Drag and Drop or ',
-            #         html.A('Select a Touchstone File'),
-            #         ' (~20 MB max).'
-            #     ]),
-            #     style={
-            #         'width': '100%',
-            #         'height': '60px',
-            #         'lineHeight': '60px',
-            #         'borderWidth': '1px',
-            #         'borderStyle': 'dashed',
-            #         'borderRadius': '5px',
-            #         'textAlign': 'center',
-            #         'margin': '10px'
-            #     },
-            #     # Allow multiple files to be uploaded
-            #     multiple=True
-            # ),
-            #     dcc.Loading(id="loading-upload", children=[html.Div(id='output-data-upload')], type="default"),
             html.Div([
                 html.Div([
                     html.Button('Plot', id='button'),
@@ -159,7 +142,6 @@ def render_content(tab):
                                 }],
                                 columns=[{"name": "Parameters",
                                           "id": "Parameters"}],
-                                # data=[],
                                 editable=False,
                                 row_selectable="multi",
                                 selected_rows=[],
@@ -287,7 +269,6 @@ def load_touchstone(content_string: str, filename: str) -> rf.Network:
 @app.callback([Output('port-table-div', 'open'),
                Output('port-table', 'data')],
               # [Input('tabs-example', 'value')],
-              # [State('output-data-upload', 'children')])
               [Input('button', 'n_clicks')],
               [State('loaded-S-data', 'children')])
 def update_port_table(_, json_data):
@@ -310,8 +291,8 @@ def update_port_table(_, json_data):
         return True, ports
 
 
-@app.callback([Output('output-data-upload', 'children'),
-               Output('loaded-S-data', 'children')],
+@app.callback([Output('loaded-S-data', 'children'),
+               Output('uploaded-data-table', 'data')],
               [Input('upload-data', 'contents')],
               [State('upload-data', 'filename'),
                State('upload-data', 'last_modified')])
@@ -320,6 +301,7 @@ def update_s_output(list_of_contents, list_of_names, list_of_dates):
         ch = []
         ports = []
         d = {}
+        d2 = []
         content_type = []
         content_string = []
         for i, c in enumerate(list_of_contents):
@@ -336,16 +318,13 @@ def update_s_output(list_of_contents, list_of_names, list_of_dates):
                     'There was an error processing this file.'
                 ]),
                         html.Div([]))
-            ch.append((html.Div([
-                html.Div(data.__str__()),
-                html.Hr()
-            ])))
+            d2.append({'data': data.__str__()})
             if write_snp:
                 d[n] = data.write_touchstone(return_string=True)
             else:
                 d[n] = data.__dict__
 
-        return ch, html.Div(json.dumps(d, cls=TouchstoneEncoder))
+        return html.Div(json.dumps(d, cls=TouchstoneEncoder)), d2
 
 @app.callback(
     Output('output-plot', "children"),
@@ -353,22 +332,34 @@ def update_s_output(list_of_contents, list_of_names, list_of_dates):
     #    Input('nsmooth_input', 'n_submit'), Input('nsmooth_input', 'n_blur')],
     [State('parm-select', 'value'),
      State('axes-select', 'value'),
+     State('uploaded-data-table', "derived_virtual_selected_rows"),
+     State('uploaded-data-table', "derived_virtual_data"),
      State('port-table', "derived_virtual_selected_rows"),
      State('port-table', "derived_virtual_data"),
      State('loaded-S-data', 'children'),
      ])
-def update_graph(n_clicks, parm, axes_format, selected_rows, selected_data, s_data):
-    json_data = s_data
-    if json_data is None or json_data == []:
-        return html.Div(children='Please Upload Data to Plot.')
+def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_data,
+                 selected_rows, selected_data, s_data):
+    if not selected_ntwk_rows:
+        return html.Div(children='Please Upload and Select Data to Plot.')
     elif not selected_rows:
         return html.Div(children='Please Select Ports to Plot.')
     else:
+        s_data = json.loads(s_data['props']['children'])
+        data = {}
+        for r in selected_ntwk_rows:
+            m = re.search(r"Network: '(.*)', ", selected_ntwk_data[r]['data'])
+            if m:
+                for key, val in s_data.items():
+                    if re.search(m.group(1), key):
+                        data[key] = val
+        # json_data = s_data
+
         traces1 = []
         traces2 = []
         layout1 = []
         layout2 = []
-        data = json.loads(json_data['props']['children'])
+
         for key, val in data.items():
             if write_snp:
                 ntwk = load_touchstone(val.encode(), key)
