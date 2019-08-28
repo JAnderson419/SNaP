@@ -128,6 +128,7 @@ def render_content(tab):
                             options=[
                                 {'label': 'Magnitude/Phase', 'value': 'MAG'},
                                 {'label': 'Real/Imaginary', 'value': 'RI'},
+                                {'label': 'Magnitude/Time Domain', 'value': 'Time'},
                                 {'label': 'Bode', 'value': 'Bode'}
                             ],
                             value='MAG')]),
@@ -380,11 +381,14 @@ def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_
                             yvals1 = []
                             yvals2 = []
                             if axes_format == "MAG":
-                                yvals1.append(np.abs(ntwk.s[:, i, j]))
-                                yvals2.append(np.angle(ntwk.s[:, i, j]))
+                                yvals1.append(ntwk.s_mag[:, i, j])
+                                yvals2.append(ntwk.s_deg[:, i, j])
                             elif axes_format == "RI":
-                                yvals1.append(np.real(ntwk.s[:, i, j]))
-                                yvals2.append(np.imag(ntwk.s[:, i, j]))
+                                yvals1.append(ntwk.s_re[:, i, j])
+                                yvals2.append(ntwk.s_im[:, i, j])
+                            elif axes_format == "Time":
+                                yvals1.append(ntwk.s_mag[:, i, j])
+                                yvals2.append(ntwk.s_time_mag[:, i, j])
                             elif axes_format == "Bode":
                                 # mpl_to_plotly and plotly don't support Bode plots, so data is plotted
                                 # in mpl and read in as image. traces1 stores y data, traces2 stores
@@ -394,12 +398,12 @@ def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_
                                 continue  # skip normal plotly output
 
                             traces1.append(
-                                go.Scatter(x=ntwk.f, y=yvals1[0],
+                                go.Scatter(x=ntwk.f, y=yvals1[0], mode='lines+markers',
                                            name='{}{}{} {}'.format(parm, i + 1, j + 1, key)
                                            )
                             )
                             traces2.append(
-                                go.Scatter(x=ntwk.f, y=yvals2[0],
+                                go.Scatter(x=ntwk.f, y=yvals2[0], mode='lines+markers',
                                            name='{}{}{} {}'.format(parm, i + 1, j + 1, key)
                                            )
                             )
@@ -441,6 +445,25 @@ def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_
                        'exponentformat': 'SI'},
                 yaxis={'type': 'linear',
                        'title': '{} Parameter Imaginary'.format(parm)},
+                margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
+                legend={'x': 0, 'y': 1},
+                hovermode='closest'
+            ))
+        elif axes_format == "Time":
+            layout1.append(go.Layout(
+                xaxis={'title': 'Frequency [Hz]',
+                       'exponentformat': 'SI'},
+                yaxis={'type': 'log',
+                       'title': '{} Parameter Magnitude'.format(parm)},
+                margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
+                legend={'x': 0, 'y': 1},
+                hovermode='closest'
+            ))
+            layout2.append(go.Layout(
+                xaxis={'title': 'Frequency [Hz]',
+                       'exponentformat': 'SI'},
+                yaxis={'type': 'log',
+                       'title': '{} Parameter, Time Domain'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
                 legend={'x': 0, 'y': 1},
                 hovermode='closest'
