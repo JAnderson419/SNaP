@@ -402,11 +402,22 @@ def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_
                                            name='{}{}{} {}'.format(parm, i + 1, j + 1, key)
                                            )
                             )
-                            traces2.append(
-                                go.Scatter(x=ntwk.f, y=yvals2[0], mode='lines+markers',
-                                           name='{}{}{} {}'.format(parm, i + 1, j + 1, key)
-                                           )
-                            )
+                            if axes_format == "Time":
+                                traces2.append(
+                                    go.Scatter(x=ntwk.frequency.t, y=yvals2[0],
+                                               mode='lines+markers',
+                                               name='{}{}{} {}'.format(parm, i + 1,
+                                                                       j + 1, key)
+                                               )
+                                )
+                            else:
+                                traces2.append(
+                                    go.Scatter(x=ntwk.f, y=yvals2[0],
+                                               mode='lines+markers',
+                                               name='{}{}{} {}'.format(parm, i + 1,
+                                                                       j + 1, key)
+                                               )
+                                )
                         else:
                             continue
 
@@ -460,7 +471,7 @@ def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_
                 hovermode='closest'
             ))
             layout2.append(go.Layout(
-                xaxis={'title': 'Frequency [Hz]',
+                xaxis={'title': 'Time [s]',
                        'exponentformat': 'SI'},
                 yaxis={'type': 'log',
                        'title': '{} Parameter, Time Domain'.format(parm)},
