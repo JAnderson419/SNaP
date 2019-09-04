@@ -10,6 +10,7 @@ import os
 import json
 import re
 
+import dash
 import dash_table
 import numpy as np
 import matplotlib.pyplot as plt
@@ -198,10 +199,16 @@ def render_content(tab):
                     dcc.Loading(id="loading-plot",
                                 children=[html.Div(id='output-plot')],
                                 type="default")
-                ], className="nine columns")
+                ], className="nine columns"),
             ], className="row"),
+            html.Div(id='currently-plotted',
+                     style={'display': 'none'})
         ])
 
+
+############################################
+# Todo: Remove these functions once skrf v15.0 released \
+#  (functions implemented natively in https://github.com/scikit-rf/scikit-rf/pull/279).
 
 class TouchstoneEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -227,6 +234,8 @@ def from_json(obj):
     ntwk.variables = obj['variables']
     return ntwk
 
+
+################################################
 
 def load_touchstone(content_string: str, filename: str) -> rf.Network:
     """
@@ -330,15 +339,15 @@ def update_s_output(list_of_contents, list_of_names, list_of_dates):
 
 
 @app.callback(Output('plot-options', 'children'),
-              [Input('axes-select', 'value')],
+              [Input('currently-plotted', 'children')],
               [State('graph1', "figure"),
                State('graph2', "figure")])
-def generate_options(axes_format, fig1, fig2):
-    if axes_format == 'MAG':
+def generate_options(plotted_axes_format, fig1, fig2):
+    if plotted_axes_format == 'MAG':
         return html.Div()
-    elif axes_format == 'RI':
+    elif plotted_axes_format == 'RI':
         return html.Div()
-    elif axes_format == 'TIME':
+    elif plotted_axes_format == 'TIME':
         fig1_x = fig1['data'][0]['x']
         fig2_x = fig2['data'][0]['x']
         return html.Div(
@@ -367,7 +376,7 @@ def generate_options(axes_format, fig1, fig2):
                 html.Div('\n'),
             ])
         )
-    elif axes_format == 'BODE':
+    elif plotted_axes_format == 'BODE':
         return html.Div()
     else:
         return html.Div()
@@ -424,24 +433,36 @@ def time_gate_plot(_, fig1, fig2, fgate, tgate):
     return fig1, fig2
 
 @app.callback(
-    Output('output-plot', "children"),
+    [Output('output-plot', "children"),
+     Output('currently-plotted', 'children')],
     [Input('button', 'n_clicks')],
     #    Input('nsmooth_input', 'n_submit'), Input('nsmooth_input', 'n_blur')],
     [State('parm-select', 'value'),
      State('axes-select', 'value'),
+     State('currently-plotted', 'children'),
      State('uploaded-data-table', "derived_virtual_selected_rows"),
      State('uploaded-data-table', "derived_virtual_data"),
      State('port-table', "derived_virtual_selected_rows"),
      State('port-table', "derived_virtual_data"),
      State('loaded-S-data', 'children'),
      ])
-def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_data,
+def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
+                 selected_ntwk_data,
                  selected_rows, selected_data, s_data):
+    plotted_axes_format_output = 'None'
     if not selected_ntwk_rows:
-        return html.Div(children='Please Upload and Select Data to Plot.')
+        return (html.Div(children='Please Upload and Select Data to Plot.'),
+                plotted_axes_format_output)
     elif not selected_rows:
-        return html.Div(children='Please Select Ports to Plot.')
+        return (html.Div(children='Please Select Ports to Plot.'),
+                plotted_axes_format_output)
     else:
+
+        if axes_format == plotted_axes_format:
+            plotted_axes_format_output = dash.no_update
+        else:
+            plotted_axes_format_output = axes_format
+
         s_data = json.loads(s_data['props']['children'])
         data = {}
         for r in selected_ntwk_rows:
@@ -592,13 +613,18 @@ def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_
             plt.close('all')
             out_img.seek(0)  # rewind file
             encoded = base64.b64encode(out_img.read()).decode("ascii").replace("\n", "")
-            return html.Div([  # skip normal plotly graph return and return image of plt.figure() instead
-                html.Div('Interactive Bode plots not yet supported.'),
-                html.Img(src="data:image/png;base64,{}".format(encoded))
-            ])
-        return html.Div(
-            [
+            return (
+                html.Div([
+                    # skip normal plotly graph return and return image of plt.figure() instead
+                    html.Div('Interactive Bode plots not yet supported.'),
+                    html.Img(src="data:image/png;base64,{}".format(encoded))
+                ]),
+                plotted_axes_format_output
+            )
+        return (
+            html.Div([
                 dcc.Graph(id='graph1', figure={'data': traces1, 'layout': layout1[0]}),
                 dcc.Graph(id='graph2', figure={'data': traces2, 'layout': layout2[0]})
-            ]
+            ]),
+            plotted_axes_format_output
         )
