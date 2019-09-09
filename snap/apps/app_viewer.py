@@ -280,22 +280,25 @@ def load_touchstone(content_string: str, filename: str) -> rf.Network:
 @app.callback([Output('port-table-div', 'open'),
                Output('port-table', 'data')],
               # [Input('tabs-example', 'value')],
-              [Input('button', 'n_clicks')],
-              [State('uuid-hidden-div', 'children')])
-def update_port_table(_, uuid):
-    json_data = cache.get(uuid)
-    if not json_data:
+              [Input('button', 'n_clicks')],  # "derived_virtual_data"
+              [State('uploaded-data-table', "derived_virtual_data"),
+               State('uploaded-data-table', "derived_virtual_selected_rows")])
+def update_port_table(_, data, selected_rows):
+    print(selected_rows, data)
+    if not selected_rows:
         return False, []
     else:
         maxports = 0
-        data = json.loads(json_data)
-        for key, val in data.items():
-            if write_snp:
-                ntwk = load_touchstone(val.encode(), key)
-            else:
-                ntwk = from_json(val)
-            if maxports < ntwk.nports:
-                maxports = ntwk.nports
+        for r in selected_rows:
+            d = data[r]
+            print(d)
+            try:
+                nport = int(re.search(r'(\d*)-Port Network', d['data']).group(1))
+            except AttributeError:
+                print("Number of ports not found in print(skrf.Network()).")
+                return False, []
+            if maxports < nport:
+                maxports = nport
         ports = []
         for i in range(maxports):
             for j in range(maxports):
