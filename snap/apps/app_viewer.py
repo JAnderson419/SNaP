@@ -68,13 +68,13 @@ layout = html.Div([
                     ), style={'overflowX': 'auto'}
                 ),
                 dcc.Loading(id="loading-upload",
-                            children=[html.Div(id='loaded-S-data')],
+                            children=[html.Div(id='data-uploading')],
                             type="default"),
             ], className='three columns', style={'word-wrap': 'break-word'},
         ),
         html.Div(id='tabs-content', className='nine columns'), ], className='row'
     ),
-    html.Div(id='loaded-S-data', style={'display': 'none'}),
+    html.Div(id='data-uploading', style={'display': 'none'}),
     html.Div(id='uuid-hidden-div',
              children=str(uuid4()),
              style={'display': 'none'})
@@ -281,13 +281,14 @@ def load_touchstone(content_string: str, filename: str) -> rf.Network:
                Output('port-table', 'data')],
               # [Input('tabs-example', 'value')],
               [Input('button', 'n_clicks')],
-              [State('loaded-S-data', 'children')])
-def update_port_table(_, json_data):
+              [State('uuid-hidden-div', 'children')])
+def update_port_table(_, uuid):
+    json_data = cache.get(uuid)
     if not json_data:
         return False, []
     else:
         maxports = 0
-        data = json.loads(json_data['props']['children'])
+        data = json.loads(json_data)
         for key, val in data.items():
             if write_snp:
                 ntwk = load_touchstone(val.encode(), key)
@@ -302,12 +303,13 @@ def update_port_table(_, json_data):
         return True, ports
 
 
-@app.callback([Output('loaded-S-data', 'children'),
-               Output('uploaded-data-table', 'data')],
+@app.callback([Output('uploaded-data-table', 'data'),
+               Output('data-uploading', 'children')],
               [Input('upload-data', 'contents')],
               [State('upload-data', 'filename'),
-               State('upload-data', 'last_modified')])
-def update_s_output(list_of_contents, list_of_names, list_of_dates):
+               State('upload-data', 'last_modified'),
+               State('uuid-hidden-div', 'children')])
+def update_s_output(list_of_contents, list_of_names, list_of_dates, uuid):
     if list_of_contents is not None:
         ch = []
         ports = []
@@ -325,17 +327,15 @@ def update_s_output(list_of_contents, list_of_names, list_of_dates):
                 data = load_touchstone(decoded, n)
             except Exception as e:
                 print(e)
-                return (html.Div([
-                    'There was an error processing this file.'
-                ]),
-                        html.Div([]))
+                return html.Div(['There was an error processing this file.']), None
             d2.append({'data': data.__str__()})
             if write_snp:
                 d[n] = data.write_touchstone(return_string=True)
             else:
                 d[n] = data.__dict__
 
-        return html.Div(json.dumps(d, cls=TouchstoneEncoder)), d2
+        cache.set(uuid, json.dumps(d, cls=TouchstoneEncoder))
+        return d2, '1'
 
 
 @app.callback(Output('plot-options', 'children'),
@@ -444,11 +444,11 @@ def time_gate_plot(_, fig1, fig2, fgate, tgate):
      State('uploaded-data-table', "derived_virtual_data"),
      State('port-table', "derived_virtual_selected_rows"),
      State('port-table', "derived_virtual_data"),
-     State('loaded-S-data', 'children'),
+     State('uuid-hidden-div', 'children'),
      ])
 def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                  selected_ntwk_data,
-                 selected_rows, selected_data, s_data):
+                 selected_rows, selected_data, uuid):
     plotted_axes_format_output = 'None'
     if not selected_ntwk_rows:
         return (html.Div(children='Please Upload and Select Data to Plot.'),
@@ -462,8 +462,7 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
             plotted_axes_format_output = dash.no_update
         else:
             plotted_axes_format_output = axes_format
-
-        s_data = json.loads(s_data['props']['children'])
+        s_data = json.loads(cache.get(uuid))
         data = {}
         for r in selected_ntwk_rows:
             m = re.search(r"Network: '(.*)', ", selected_ntwk_data[r]['data'])
