@@ -10,6 +10,7 @@ import os
 import json
 import re
 
+import dash
 import dash_table
 import numpy as np
 import matplotlib.pyplot as plt
@@ -128,7 +129,8 @@ def render_content(tab):
                             options=[
                                 {'label': 'Magnitude/Phase', 'value': 'MAG'},
                                 {'label': 'Real/Imaginary', 'value': 'RI'},
-                                {'label': 'Bode', 'value': 'Bode'}
+                                {'label': 'Magnitude/Time Domain', 'value': 'TIME'},
+                                {'label': 'Bode', 'value': 'BODE'}
                             ],
                             value='MAG')]),
                     html.Details(id='port-table-div', children=[
@@ -189,6 +191,7 @@ def render_content(tab):
                         # )
                     ]
                                  ),
+                    html.Div(id='plot-options'),
                     # html.Hr(),
                 ], className="three columns"),
                 html.Div([
@@ -196,10 +199,16 @@ def render_content(tab):
                     dcc.Loading(id="loading-plot",
                                 children=[html.Div(id='output-plot')],
                                 type="default")
-                ], className="nine columns")
+                ], className="nine columns"),
             ], className="row"),
+            html.Div(id='currently-plotted',
+                     style={'display': 'none'})
         ])
 
+
+############################################
+# Todo: Remove these functions once skrf v15.0 released \
+#  (functions implemented natively in https://github.com/scikit-rf/scikit-rf/pull/279).
 
 class TouchstoneEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -225,6 +234,8 @@ def from_json(obj):
     ntwk.variables = obj['variables']
     return ntwk
 
+
+################################################
 
 def load_touchstone(content_string: str, filename: str) -> rf.Network:
     """
@@ -326,25 +337,132 @@ def update_s_output(list_of_contents, list_of_names, list_of_dates):
 
         return html.Div(json.dumps(d, cls=TouchstoneEncoder)), d2
 
+
+@app.callback(Output('plot-options', 'children'),
+              [Input('currently-plotted', 'children')],
+              [State('graph1', "figure"),
+               State('graph2', "figure")])
+def generate_options(plotted_axes_format, fig1, fig2):
+    if plotted_axes_format == 'MAG':
+        return html.Div()
+    elif plotted_axes_format == 'RI':
+        return html.Div()
+    elif plotted_axes_format == 'TIME':
+        fig1_x = fig1['data'][0]['x']
+        fig2_x = fig2['data'][0]['x']
+        return html.Div(
+            html.Details([
+                html.Summary('Timegating Options'),
+                html.Button(id='timegate-button', children='Time Gate Visible Traces'),
+                html.H6("Frequency Gate"),
+                dcc.RangeSlider(
+                    id='freq-gate-slider',
+                    min=min(fig1_x),
+                    max=max(fig1_x),
+                    step=(max(fig1_x) - min(fig1_x)) / len(fig1_x),
+                    value=[min(fig1_x), max(fig1_x)]
+                ),
+                html.Div(id='freq-gate-slider-value'),
+                html.Div('\n'),
+                html.H6("Time Gate"),
+                dcc.RangeSlider(
+                    id='time-gate-slider',
+                    min=min(fig2_x),
+                    max=max(fig2_x),
+                    step=(max(fig2_x) - min(fig2_x)) / len(fig2_x),
+                    value=[min(fig2_x), max(fig2_x)]
+                ),
+                html.Div(id='time-gate-slider-value'),
+                html.Div('\n'),
+            ])
+        )
+    elif plotted_axes_format == 'BODE':
+        return html.Div()
+    else:
+        return html.Div()
+
+
+for slider in ['freq-gate-slider', 'time-gate-slider']:
+    @app.callback(
+        Output(f'{slider}-value', 'children'),
+        [Input(slider, "value")]
+    )
+    def update_slider_values(value):
+        return f'{value[0]:0.2g} to {value[1]:0.2g}.'
+
+
 @app.callback(
-    Output('output-plot', "children"),
+    [Output('graph1', "figure"),
+     Output('graph2', "figure")],
+    [Input('timegate-button', 'n_clicks')],
+    [State('graph1', "figure"),
+     State('graph2', "figure"),
+     State('freq-gate-slider', "value"),
+     State('time-gate-slider', 'value')
+     ])
+def time_gate_plot(_, fig1, fig2, fgate, tgate):
+    ftracelist = []
+    ttracelist = []
+    for d in fig1['data']:
+        ntwk = rf.Network(f=np.asfarray(d['x']), f_unit='hz', name=d['name'],
+                          s=np.asfarray(d['y']), z0=50)
+        # print(ntwk)
+        # print(ntwk.time_gate(start=tgate[0], stop=tgate[1]).s_mag)
+        ftracelist.append(
+            go.Scatter(x=ntwk[f"{fgate[0]}-{fgate[1]}"].f,
+                       y=ntwk[f"{fgate[0]}-{fgate[1]}"].time_gate(
+                           start=tgate[0] * 1e9,
+                           stop=tgate[1] * 1e9).s_mag.flatten(),
+                       mode='lines',
+                       name=f"{d['name']} Gated ({fgate[0]:0.2g}-{fgate[1]:0.2g} Hz," +
+                            f" {tgate[0]:0.2g}-{tgate[1]:0.2g} sec)"
+                       )
+        )
+        # [f"{fgate[0]}-{fgate[1]}"]
+        ttracelist.append(
+            go.Scatter(x=ntwk[f"{fgate[0]}-{fgate[1]}"].frequency.t,
+                       y=ntwk[f"{fgate[0]}-{fgate[1]}"].time_gate(
+                           start=tgate[0] * 1e9,
+                           stop=tgate[1] * 1e9).s_time_mag.flatten(),
+                       mode='lines',
+                       name=f"{d['name']} Gated ({fgate[0]:0.2g}-{fgate[1]:0.2g} Hz)"
+                       )
+        )
+    [fig1['data'].append(t) for t in ftracelist]
+    [fig2['data'].append(t) for t in ttracelist]
+    return fig1, fig2
+
+@app.callback(
+    [Output('output-plot', "children"),
+     Output('currently-plotted', 'children')],
     [Input('button', 'n_clicks')],
     #    Input('nsmooth_input', 'n_submit'), Input('nsmooth_input', 'n_blur')],
     [State('parm-select', 'value'),
      State('axes-select', 'value'),
+     State('currently-plotted', 'children'),
      State('uploaded-data-table', "derived_virtual_selected_rows"),
      State('uploaded-data-table', "derived_virtual_data"),
      State('port-table', "derived_virtual_selected_rows"),
      State('port-table', "derived_virtual_data"),
      State('loaded-S-data', 'children'),
      ])
-def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_data,
+def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
+                 selected_ntwk_data,
                  selected_rows, selected_data, s_data):
+    plotted_axes_format_output = 'None'
     if not selected_ntwk_rows:
-        return html.Div(children='Please Upload and Select Data to Plot.')
+        return (html.Div(children='Please Upload and Select Data to Plot.'),
+                plotted_axes_format_output)
     elif not selected_rows:
-        return html.Div(children='Please Select Ports to Plot.')
+        return (html.Div(children='Please Select Ports to Plot.'),
+                plotted_axes_format_output)
     else:
+
+        if axes_format == plotted_axes_format:
+            plotted_axes_format_output = dash.no_update
+        else:
+            plotted_axes_format_output = axes_format
+
         s_data = json.loads(s_data['props']['children'])
         data = {}
         for r in selected_ntwk_rows:
@@ -380,12 +498,15 @@ def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_
                             yvals1 = []
                             yvals2 = []
                             if axes_format == "MAG":
-                                yvals1.append(np.abs(ntwk.s[:, i, j]))
-                                yvals2.append(np.angle(ntwk.s[:, i, j]))
+                                yvals1.append(ntwk.s_mag[:, i, j])
+                                yvals2.append(ntwk.s_deg[:, i, j])
                             elif axes_format == "RI":
-                                yvals1.append(np.real(ntwk.s[:, i, j]))
-                                yvals2.append(np.imag(ntwk.s[:, i, j]))
-                            elif axes_format == "Bode":
+                                yvals1.append(ntwk.s_re[:, i, j])
+                                yvals2.append(ntwk.s_im[:, i, j])
+                            elif axes_format == "TIME":
+                                yvals1.append(ntwk.s_mag[:, i, j])
+                                yvals2.append(ntwk.s_time_mag[:, i, j])
+                            elif axes_format == "BODE":
                                 # mpl_to_plotly and plotly don't support Bode plots, so data is plotted
                                 # in mpl and read in as image. traces1 stores y data, traces2 stores
                                 # trace labels for figure
@@ -394,15 +515,26 @@ def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_
                                 continue  # skip normal plotly output
 
                             traces1.append(
-                                go.Scatter(x=ntwk.f, y=yvals1[0],
+                                go.Scatter(x=ntwk.f, y=yvals1[0], mode='lines',
                                            name='{}{}{} {}'.format(parm, i + 1, j + 1, key)
                                            )
                             )
-                            traces2.append(
-                                go.Scatter(x=ntwk.f, y=yvals2[0],
-                                           name='{}{}{} {}'.format(parm, i + 1, j + 1, key)
-                                           )
-                            )
+                            if axes_format == "TIME":
+                                traces2.append(
+                                    go.Scatter(x=ntwk.frequency.t, y=yvals2[0],
+                                               mode='lines',
+                                               name='{}{}{} {}'.format(parm, i + 1,
+                                                                       j + 1, key)
+                                               )
+                                )
+                            else:
+                                traces2.append(
+                                    go.Scatter(x=ntwk.f, y=yvals2[0],
+                                               mode='lines',
+                                               name='{}{}{} {}'.format(parm, i + 1,
+                                                                       j + 1, key)
+                                               )
+                                )
                         else:
                             continue
 
@@ -414,7 +546,7 @@ def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_
                 yaxis={'type': 'log',
                        'title': '{} Parameter Magnitude'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 1},
+                legend={'x': 0, 'y': 0},
                 hovermode='closest'
             ))
             layout2.append(go.Layout(
@@ -423,7 +555,7 @@ def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_
                 yaxis={'type': 'linear',
                        'title': '{} Parameter Phase'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 1},
+                legend={'x': 0, 'y': 0},
                 hovermode='closest'
             ))
         elif axes_format == "RI":
@@ -433,7 +565,7 @@ def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_
                 yaxis={'type': 'linear',
                        'title': '{} Parameter Real'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 1},
+                legend={'x': 0, 'y': 0},
                 hovermode='closest'
             ))
             layout2.append(go.Layout(
@@ -442,10 +574,29 @@ def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_
                 yaxis={'type': 'linear',
                        'title': '{} Parameter Imaginary'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 1},
+                legend={'x': 0, 'y': 0},
                 hovermode='closest'
             ))
-        elif axes_format == "Bode":
+        elif axes_format == "TIME":
+            layout1.append(go.Layout(
+                xaxis={'title': 'Frequency [Hz]',
+                       'exponentformat': 'SI'},
+                yaxis={'type': 'log',
+                       'title': '{} Parameter Magnitude'.format(parm)},
+                margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
+                legend={'x': 0, 'y': 0},
+                hovermode='closest'
+            ))
+            layout2.append(go.Layout(
+                xaxis={'title': 'Time [s]',
+                       'exponentformat': 'SI'},
+                yaxis={'type': 'log',
+                       'title': '{} Parameter, Time Domain'.format(parm)},
+                margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
+                legend={'x': 0, 'y': 0},
+                hovermode='closest'
+            ))
+        elif axes_format == "BODE":
             # See https://github.com/4QuantOSS/DashIntro/blob/master/notebooks/Tutorial.ipynb
             # for example of encoding mpl figure to image for dash
             fig = plt.figure()
@@ -462,13 +613,18 @@ def update_graph(n_clicks, parm, axes_format, selected_ntwk_rows, selected_ntwk_
             plt.close('all')
             out_img.seek(0)  # rewind file
             encoded = base64.b64encode(out_img.read()).decode("ascii").replace("\n", "")
-            return html.Div([  # skip normal plotly graph return and return image of plt.figure() instead
-                html.Div('Interactive Bode plots not yet supported.'),
-                html.Img(src="data:image/png;base64,{}".format(encoded))
-            ])
-        return html.Div(
-            [
-                dcc.Graph(figure={'data': traces1, 'layout': layout1[0]}),
-                dcc.Graph(figure={'data': traces2, 'layout': layout2[0]})
-            ]
+            return (
+                html.Div([
+                    # skip normal plotly graph return and return image of plt.figure() instead
+                    html.Div('Interactive Bode plots not yet supported.'),
+                    html.Img(src="data:image/png;base64,{}".format(encoded))
+                ]),
+                plotted_axes_format_output
+            )
+        return (
+            html.Div([
+                dcc.Graph(id='graph1', figure={'data': traces1, 'layout': layout1[0]}),
+                dcc.Graph(id='graph2', figure={'data': traces2, 'layout': layout2[0]})
+            ]),
+            plotted_axes_format_output
         )
