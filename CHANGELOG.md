@@ -1,3 +1,7 @@
+# V 0.3.0
+Initial Time Gating Support in viewer app
+
+# V 0.2.0
 Switched to tabular based layout with loaded data always visible,
 in preparation for adding new "apps" beyond the snp viewer in the future.
 
