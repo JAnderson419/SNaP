@@ -27,7 +27,8 @@ from app import app
 cache = Cache(app.server, config={
     'CACHE_TYPE': 'filesystem',
     'CACHE_DIR': os.path.join(os.getcwd(), 'cache'),
-    'CACHE_THRESHOLD': 20
+    'CACHE_THRESHOLD': 20,
+    'CACHE_DEFAULT_TIMEOUT': 1200
 })
 
 write_snp = False
@@ -45,6 +46,9 @@ layout = html.Div([
             [
                 html.H4("Loaded Data:"),
                 html.Hr(),
+                dcc.Loading(id="loading-upload",
+                            children=[html.Div(id='data-uploading')],
+                            type="default"),
                 html.Div(
                     dash_table.DataTable(
                         id='uploaded-data-table',
@@ -67,9 +71,6 @@ layout = html.Div([
                         selected_rows=[],
                     ), style={'overflowX': 'auto'}
                 ),
-                dcc.Loading(id="loading-upload",
-                            children=[html.Div(id='data-uploading')],
-                            type="default"),
             ], className='three columns', style={'word-wrap': 'break-word'},
         ),
         html.Div(id='tabs-content', className='nine columns'), ], className='row'
@@ -284,14 +285,12 @@ def load_touchstone(content_string: str, filename: str) -> rf.Network:
               [State('uploaded-data-table', "derived_virtual_data"),
                State('uploaded-data-table', "derived_virtual_selected_rows")])
 def update_port_table(_, data, selected_rows):
-    print(selected_rows, data)
     if not selected_rows:
         return False, []
     else:
         maxports = 0
         for r in selected_rows:
             d = data[r]
-            print(d)
             try:
                 nport = int(re.search(r'(\d*)-Port Network', d['data']).group(1))
             except AttributeError:
@@ -435,6 +434,7 @@ def time_gate_plot(_, fig1, fig2, fgate, tgate):
     [fig2['data'].append(t) for t in ttracelist]
     return fig1, fig2
 
+
 @app.callback(
     [Output('output-plot', "children"),
      Output('currently-plotted', 'children')],
@@ -449,6 +449,7 @@ def time_gate_plot(_, fig1, fig2, fgate, tgate):
      State('port-table', "derived_virtual_data"),
      State('uuid-hidden-div', 'children'),
      ])
+@cache.memoize()
 def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                  selected_ntwk_data,
                  selected_rows, selected_data, uuid):
@@ -465,7 +466,13 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
             plotted_axes_format_output = dash.no_update
         else:
             plotted_axes_format_output = axes_format
-        s_data = json.loads(cache.get(uuid))
+        try:
+            s_data = json.loads(cache.get(uuid))
+        except TypeError:
+            return (html.Div(children='Data could not be retrieved from cache. '
+                                      'Your session may have timed out.'
+                                      'Please re-upload your data and try again.'),
+                    plotted_axes_format_output)
         data = {}
         for r in selected_ntwk_rows:
             m = re.search(r"Network: '(.*)', ", selected_ntwk_data[r]['data'])
@@ -517,25 +524,25 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                                 continue  # skip normal plotly output
 
                             traces1.append(
-                                go.Scatter(x=ntwk.f, y=yvals1[0], mode='lines',
-                                           name='{}{}{} {}'.format(parm, i + 1, j + 1, key)
-                                           )
+                                go.Scattergl(x=ntwk.f, y=yvals1[0], mode='lines',
+                                             name='{}{}{} {}'.format(parm, i + 1, j + 1, key)
+                                             )
                             )
                             if axes_format == "TIME":
                                 traces2.append(
-                                    go.Scatter(x=ntwk.frequency.t, y=yvals2[0],
-                                               mode='lines',
-                                               name='{}{}{} {}'.format(parm, i + 1,
+                                    go.Scattergl(x=ntwk.frequency.t, y=yvals2[0],
+                                                 mode='lines',
+                                                 name='{}{}{} {}'.format(parm, i + 1,
                                                                        j + 1, key)
-                                               )
+                                                 )
                                 )
                             else:
                                 traces2.append(
-                                    go.Scatter(x=ntwk.f, y=yvals2[0],
-                                               mode='lines',
-                                               name='{}{}{} {}'.format(parm, i + 1,
+                                    go.Scattergl(x=ntwk.f, y=yvals2[0],
+                                                 mode='lines',
+                                                 name='{}{}{} {}'.format(parm, i + 1,
                                                                        j + 1, key)
-                                               )
+                                                 )
                                 )
                         else:
                             continue
@@ -548,7 +555,7 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                 yaxis={'type': 'log',
                        'title': '{} Parameter Magnitude'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 0},
+                legend={'x': 1, 'y': 1},
                 hovermode='closest'
             ))
             layout2.append(go.Layout(
@@ -557,7 +564,7 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                 yaxis={'type': 'linear',
                        'title': '{} Parameter Phase'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 0},
+                legend={'x': 1, 'y': 1},
                 hovermode='closest'
             ))
         elif axes_format == "RI":
@@ -567,7 +574,7 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                 yaxis={'type': 'linear',
                        'title': '{} Parameter Real'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 0},
+                legend={'x': 1, 'y': 1},
                 hovermode='closest'
             ))
             layout2.append(go.Layout(
@@ -576,7 +583,7 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                 yaxis={'type': 'linear',
                        'title': '{} Parameter Imaginary'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 0},
+                legend={'x': 1, 'y': 1},
                 hovermode='closest'
             ))
         elif axes_format == "TIME":
@@ -586,7 +593,7 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                 yaxis={'type': 'log',
                        'title': '{} Parameter Magnitude'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 0},
+                legend={'x': 1, 'y': 1},
                 hovermode='closest'
             ))
             layout2.append(go.Layout(
@@ -595,7 +602,7 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                 yaxis={'type': 'log',
                        'title': '{} Parameter, Time Domain'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 0},
+                legend={'x': 1, 'y': 1},
                 hovermode='closest'
             ))
         elif axes_format == "BODE":
