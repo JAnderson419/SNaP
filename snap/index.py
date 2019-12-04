@@ -54,6 +54,8 @@ elif in_jupyterlab:
 else:
     from app import app
 
+server = app.server
+
 from apps import app_viewer
 
 if flask_debug:
