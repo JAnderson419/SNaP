@@ -27,7 +27,8 @@ from app import app
 cache = Cache(app.server, config={
     'CACHE_TYPE': 'filesystem',
     'CACHE_DIR': os.path.join(os.getcwd(), 'cache'),
-    'CACHE_THRESHOLD': 20
+    'CACHE_THRESHOLD': 20,
+    'CACHE_DEFAULT_TIMEOUT': 1200
 })
 
 write_snp = False
@@ -45,6 +46,9 @@ layout = html.Div([
             [
                 html.H4("Loaded Data:"),
                 html.Hr(),
+                dcc.Loading(id="loading-upload",
+                            children=[html.Div(id='data-uploading')],
+                            type="default"),
                 html.Div(
                     dash_table.DataTable(
                         id='uploaded-data-table',
@@ -67,14 +71,11 @@ layout = html.Div([
                         selected_rows=[],
                     ), style={'overflowX': 'auto'}
                 ),
-                dcc.Loading(id="loading-upload",
-                            children=[html.Div(id='loaded-S-data')],
-                            type="default"),
             ], className='three columns', style={'word-wrap': 'break-word'},
         ),
         html.Div(id='tabs-content', className='nine columns'), ], className='row'
     ),
-    html.Div(id='loaded-S-data', style={'display': 'none'}),
+    html.Div(id='data-uploading', style={'display': 'none'}),
     html.Div(id='uuid-hidden-div',
              children=str(uuid4()),
              style={'display': 'none'})
@@ -280,21 +281,23 @@ def load_touchstone(content_string: str, filename: str) -> rf.Network:
 @app.callback([Output('port-table-div', 'open'),
                Output('port-table', 'data')],
               # [Input('tabs-example', 'value')],
-              [Input('button', 'n_clicks')],
-              [State('loaded-S-data', 'children')])
-def update_port_table(_, json_data):
-    if not json_data:
+              [Input('button', 'n_clicks')],  # "derived_virtual_data"
+              [State('uploaded-data-table', "derived_virtual_data"),
+               State('uploaded-data-table', "derived_virtual_selected_rows")])
+def update_port_table(_, data, selected_rows):
+    if not selected_rows:
         return False, []
     else:
         maxports = 0
-        data = json.loads(json_data['props']['children'])
-        for key, val in data.items():
-            if write_snp:
-                ntwk = load_touchstone(val.encode(), key)
-            else:
-                ntwk = from_json(val)
-            if maxports < ntwk.nports:
-                maxports = ntwk.nports
+        for r in selected_rows:
+            d = data[r]
+            try:
+                nport = int(re.search(r'(\d*)-Port Network', d['data']).group(1))
+            except AttributeError:
+                print("Number of ports not found in print(skrf.Network()).")
+                return False, []
+            if maxports < nport:
+                maxports = nport
         ports = []
         for i in range(maxports):
             for j in range(maxports):
@@ -302,12 +305,13 @@ def update_port_table(_, json_data):
         return True, ports
 
 
-@app.callback([Output('loaded-S-data', 'children'),
-               Output('uploaded-data-table', 'data')],
+@app.callback([Output('uploaded-data-table', 'data'),
+               Output('data-uploading', 'children')],
               [Input('upload-data', 'contents')],
               [State('upload-data', 'filename'),
-               State('upload-data', 'last_modified')])
-def update_s_output(list_of_contents, list_of_names, list_of_dates):
+               State('upload-data', 'last_modified'),
+               State('uuid-hidden-div', 'children')])
+def update_s_output(list_of_contents, list_of_names, list_of_dates, uuid):
     if list_of_contents is not None:
         ch = []
         ports = []
@@ -325,17 +329,15 @@ def update_s_output(list_of_contents, list_of_names, list_of_dates):
                 data = load_touchstone(decoded, n)
             except Exception as e:
                 print(e)
-                return (html.Div([
-                    'There was an error processing this file.'
-                ]),
-                        html.Div([]))
+                return html.Div(['There was an error processing this file.']), None
             d2.append({'data': data.__str__()})
             if write_snp:
                 d[n] = data.write_touchstone(return_string=True)
             else:
                 d[n] = data.__dict__
 
-        return html.Div(json.dumps(d, cls=TouchstoneEncoder)), d2
+        cache.set(uuid, json.dumps(d, cls=TouchstoneEncoder))
+        return d2, '1'
 
 
 @app.callback(Output('plot-options', 'children'),
@@ -432,6 +434,7 @@ def time_gate_plot(_, fig1, fig2, fgate, tgate):
     [fig2['data'].append(t) for t in ttracelist]
     return fig1, fig2
 
+
 @app.callback(
     [Output('output-plot', "children"),
      Output('currently-plotted', 'children')],
@@ -444,11 +447,12 @@ def time_gate_plot(_, fig1, fig2, fgate, tgate):
      State('uploaded-data-table', "derived_virtual_data"),
      State('port-table', "derived_virtual_selected_rows"),
      State('port-table', "derived_virtual_data"),
-     State('loaded-S-data', 'children'),
+     State('uuid-hidden-div', 'children'),
      ])
+@cache.memoize()
 def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                  selected_ntwk_data,
-                 selected_rows, selected_data, s_data):
+                 selected_rows, selected_data, uuid):
     plotted_axes_format_output = 'None'
     if not selected_ntwk_rows:
         return (html.Div(children='Please Upload and Select Data to Plot.'),
@@ -462,8 +466,13 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
             plotted_axes_format_output = dash.no_update
         else:
             plotted_axes_format_output = axes_format
-
-        s_data = json.loads(s_data['props']['children'])
+        try:
+            s_data = json.loads(cache.get(uuid))
+        except TypeError:
+            return (html.Div(children='Data could not be retrieved from cache. '
+                                      'Your session may have timed out.'
+                                      'Please re-upload your data and try again.'),
+                    plotted_axes_format_output)
         data = {}
         for r in selected_ntwk_rows:
             m = re.search(r"Network: '(.*)', ", selected_ntwk_data[r]['data'])
@@ -515,25 +524,25 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                                 continue  # skip normal plotly output
 
                             traces1.append(
-                                go.Scatter(x=ntwk.f, y=yvals1[0], mode='lines',
-                                           name='{}{}{} {}'.format(parm, i + 1, j + 1, key)
-                                           )
+                                go.Scattergl(x=ntwk.f, y=yvals1[0], mode='lines',
+                                             name='{}{}{} {}'.format(parm, i + 1, j + 1, key)
+                                             )
                             )
                             if axes_format == "TIME":
                                 traces2.append(
-                                    go.Scatter(x=ntwk.frequency.t, y=yvals2[0],
-                                               mode='lines',
-                                               name='{}{}{} {}'.format(parm, i + 1,
+                                    go.Scattergl(x=ntwk.frequency.t, y=yvals2[0],
+                                                 mode='lines',
+                                                 name='{}{}{} {}'.format(parm, i + 1,
                                                                        j + 1, key)
-                                               )
+                                                 )
                                 )
                             else:
                                 traces2.append(
-                                    go.Scatter(x=ntwk.f, y=yvals2[0],
-                                               mode='lines',
-                                               name='{}{}{} {}'.format(parm, i + 1,
+                                    go.Scattergl(x=ntwk.f, y=yvals2[0],
+                                                 mode='lines',
+                                                 name='{}{}{} {}'.format(parm, i + 1,
                                                                        j + 1, key)
-                                               )
+                                                 )
                                 )
                         else:
                             continue
@@ -546,7 +555,7 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                 yaxis={'type': 'log',
                        'title': '{} Parameter Magnitude'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 0},
+                legend={'x': 1, 'y': 1},
                 hovermode='closest'
             ))
             layout2.append(go.Layout(
@@ -555,7 +564,7 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                 yaxis={'type': 'linear',
                        'title': '{} Parameter Phase'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 0},
+                legend={'x': 1, 'y': 1},
                 hovermode='closest'
             ))
         elif axes_format == "RI":
@@ -565,7 +574,7 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                 yaxis={'type': 'linear',
                        'title': '{} Parameter Real'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 0},
+                legend={'x': 1, 'y': 1},
                 hovermode='closest'
             ))
             layout2.append(go.Layout(
@@ -574,7 +583,7 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                 yaxis={'type': 'linear',
                        'title': '{} Parameter Imaginary'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 0},
+                legend={'x': 1, 'y': 1},
                 hovermode='closest'
             ))
         elif axes_format == "TIME":
@@ -584,7 +593,7 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                 yaxis={'type': 'log',
                        'title': '{} Parameter Magnitude'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 0},
+                legend={'x': 1, 'y': 1},
                 hovermode='closest'
             ))
             layout2.append(go.Layout(
@@ -593,7 +602,7 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
                 yaxis={'type': 'log',
                        'title': '{} Parameter, Time Domain'.format(parm)},
                 margin={'l': 60, 'b': 40, 't': 10, 'r': 10},
-                legend={'x': 0, 'y': 0},
+                legend={'x': 1, 'y': 1},
                 hovermode='closest'
             ))
         elif axes_format == "BODE":
