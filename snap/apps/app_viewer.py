@@ -24,9 +24,16 @@ from uuid import uuid4
 
 from app import app
 
+# cache = Cache(app.server, config={
+#     'CACHE_TYPE': 'filesystem',
+#     'CACHE_DIR': os.path.join(os.getcwd(), 'cache'),
+#     'CACHE_THRESHOLD': 20,
+#     'CACHE_DEFAULT_TIMEOUT': 1200
+# })
+
 cache = Cache(app.server, config={
-    'CACHE_TYPE': 'filesystem',
-    'CACHE_DIR': os.path.join(os.getcwd(), 'cache'),
+    'CACHE_TYPE': 'redis',
+    'CACHE_REDIS_URL': os.environ.get('REDIS_URL', ''),
     'CACHE_THRESHOLD': 20,
     'CACHE_DEFAULT_TIMEOUT': 1200
 })

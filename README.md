@@ -14,4 +14,4 @@ dev: [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh
 ![demo](https://user-images.githubusercontent.com/916439/63538686-6060f580-c4e6-11e9-99fe-0b56fe6807ef.gif)
 
 
-
+For production (multi-user) setup with gunicorn and nginx on Ubuntu, see [this](https://www.digitalocean.com/community/tutorials/how-to-serve-flask-applications-with-gunicorn-and-nginx-on-ubuntu-18-04).
