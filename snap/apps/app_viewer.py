@@ -31,9 +31,10 @@ try:
         'CACHE_THRESHOLD': 20,
         'CACHE_DEFAULT_TIMEOUT': 1200
     })
-except ModuleNotFoundError:
+except RuntimeError:
     cache = Cache(app.server, config={
         'CACHE_TYPE': 'filesystem',
+
         'CACHE_DIR': os.path.join(os.getcwd(), 'cache'),
         'CACHE_THRESHOLD': 20,
         'CACHE_DEFAULT_TIMEOUT': 1200
